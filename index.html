@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trucker Intel — USDOT Carrier Database</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body,#root{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F4F0;color:#1a1a1a}
+  :root{
+    --bg:#F5F4F0;--surface:#FFFFFF;--surface2:#EEECEA;--border:rgba(0,0,0,0.10);
+    --border2:rgba(0,0,0,0.18);--text:#1a1a1a;--text2:#555;--text3:#888;
+    --amber:#EF9F27;--amber-d:#BA7517;--amber-l:#FAEEDA;--amber-text:#412402;
+    --green-bg:#EAF3DE;--green-text:#3B6D11;
+    --red-bg:#FCEBEB;--red-border:rgba(200,50,50,0.3);--red-text:#A32D2D;
+    --success-bg:#EAF3DE;--success-border:rgba(60,140,60,0.3);--success-text:#3B6D11;
+    --r:8px;--r-lg:12px;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{
+      --bg:#1C1B19;--surface:#262522;--surface2:#302E2B;--border:rgba(255,255,255,0.10);
+      --border2:rgba(255,255,255,0.18);--text:#EDEBE5;--text2:#A8A39A;--text3:#6B6660;
+      --amber:#EF9F27;--amber-d:#FAC775;--amber-l:#412402;--amber-text:#FAEEDA;
+      --green-bg:#173404;--green-text:#C0DD97;
+      --red-bg:#501313;--red-border:rgba(240,150,150,0.3);--red-text:#F09595;
+      --success-bg:#173404;--success-border:rgba(100,200,100,0.3);--success-text:#C0DD97;
+    }
+  }
+  input,select,button,textarea{font-family:inherit;font-size:13px}
+  input[type=number]::-webkit-inner-spin-button{opacity:.5}
+  .inp{width:100%;padding:7px 11px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);outline:none;transition:border-color .15s}
+  .inp:focus{border-color:var(--amber)}
+  .inp.mono{font-family:'Courier New',monospace}
+  select.inp{cursor:pointer}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 16px;font-size:12px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--r);cursor:pointer;background:var(--surface);color:var(--text);transition:all .12s;white-space:nowrap;letter-spacing:.01em;user-select:none}
+  .btn:hover{background:var(--surface2)}
+  .btn:active{transform:scale(.98)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .btn-amber{background:var(--amber);border-color:var(--amber-d);color:var(--amber-text)}
+  .btn-amber:hover:not(:disabled){background:var(--amber-d);color:var(--amber-l)}
+  .btn-red{background:var(--red-bg);border-color:var(--red-border);color:var(--red-text)}
+  .btn-sm{padding:4px 10px;font-size:11px}
+  .card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r-lg)}
+  .lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:5px;display:block}
+  .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;font-family:'Courier New',monospace}
+  .tag-amber{background:var(--amber-l);color:#633806}
+  .tag-green{background:var(--green-bg);color:var(--green-text)}
+  .tag-gray{background:var(--surface2);color:var(--text3)}
+  @media(prefers-color-scheme:dark){.tag-amber{color:#FAC775}}
+  .toast{position:fixed;bottom:20px;right:20px;z-index:9999;padding:9px 16px;border-radius:var(--r);font-size:12px;font-weight:500;border:0.5px solid;animation:ti .2s ease;max-width:300px;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
+  @keyframes ti{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .toast-ok{background:var(--success-bg);border-color:var(--success-border);color:var(--success-text)}
+  .toast-err{background:var(--red-bg);border-color:var(--red-border);color:var(--red-text)}
+  .toast-info{background:var(--amber-l);border-color:#FAC775;color:#633806}
+  .pb{height:3px;background:var(--surface2);border-radius:2px;overflow:hidden;margin:6px 0}
+  .pbf{height:100%;background:var(--amber);transition:width .3s;border-radius:2px}
+  .tbl{width:100%;border-collapse:collapse}
+  .tbl th{padding:7px 12px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);border-bottom:0.5px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+  .tbl th:hover{color:var(--text2)}
+  .tbl td{padding:8px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle;color:var(--text);font-size:12px}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl tr:hover td{background:var(--surface2)}
+  .tab{padding:6px 14px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+  .tab.active{color:var(--amber-d);border-bottom-color:var(--amber)}
+  .stat{background:var(--surface2);border-radius:var(--r);padding:10px 14px}
+  .stat-v{font-size:20px;font-weight:600;font-family:'Courier New',monospace;color:var(--text);letter-spacing:-.02em}
+  .stat-l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-top:2px}
+  .dot-id{font-family:'Courier New',monospace;font-size:12px;font-weight:600;color:var(--amber-d)}
+  .err-msg{font-size:11px;color:var(--red-text);margin-bottom:10px;padding:6px 10px;background:var(--red-bg);border-radius:6px;border:0.5px solid var(--red-border)}
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+  .sidebar{width:265px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-bottom:1rem}
+  .help-box{background:var(--surface2);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.65}
+  .help-box strong{color:var(--text)}
+  .help-box a{color:var(--amber-d)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+
+// Simple one-way hash (not cryptographic — client-side demo only)
+function hashPw(s){
+  let h=5381;
+  for(let i=0;i<s.length;i++) h=Math.imul(h,33)^s.charCodeAt(i);
+  return(h>>>0).toString(16);
+}
+
+// LocalStorage-backed "database"
+const DB={
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch{return false}},
+  get(k){try{const r=localStorage.getItem(k);return r?JSON.parse(r):null}catch{return null}},
+  del(k){try{localStorage.removeItem(k)}catch{}}
+};
+
+function formatPhone(raw){
+  if(!raw)return"";
+  const d=raw.replace(/\D/g,"");
+  if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+  if(d.length===11&&d[0]==="1")return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+  return raw;
+}
+
+function App(){
+  const [page,setPage]=useState("loading");
+  const [user,setUser]=useState(null);
+  const [apiKey,setApiKey]=useState("");
+  const [truckers,setTruckers]=useState([]);
+  const [filter,setFilter]=useState({state:"ALL",minT:"",maxT:"",q:""});
+  const [auth,setAuth]=useState({mode:"login",u:"",p:"",p2:"",err:""});
+  const [dotVal,setDotVal]=useState("");
+  const [scan,setScan]=useState({on:false,s:"",e:"",cur:0,tot:0,found:0});
+  const [apiInp,setApiInp]=useState("");
+  const [toast,setToast]=useState(null);
+  const [tab,setTab]=useState("lookup");
+  const [sf,setSf]=useState("ts");
+  const [sd,setSd]=useState(-1);
+  const [del,setDel]=useState(null);
+  const [looking,setLooking]=useState(false);
+  const scanRef=useRef(false);
+  const tRef=useRef(null);
+  const trRef=useRef([]);
+
+  const msg=(text,type="ok")=>{
+    setToast({text,type});
+    if(tRef.current)clearTimeout(tRef.current);
+    tRef.current=setTimeout(()=>setToast(null),3500);
+  };
+
+  // Init: check session
+  useEffect(()=>{
+    const sess=DB.get("_sess");
+    if(sess&&sess.u){
+      const ud=DB.get(`u:${sess.u}`);
+      if(ud){
+        const trs=DB.get(`t:${sess.u}`)||[];
+        trRef.current=trs;
+        setUser(sess.u);setApiKey(ud.ak||"");setTruckers(trs);
+        setPage(ud.ak?"dash":"setup");return;
+      }
+    }
+    setPage("auth");
+  },[]);
+
+  // AUTH
+  const authSubmit=()=>{
+    const{mode,u,p,p2}=auth;
+    const un=u.trim().toLowerCase();
+    if(!un||!p) return setAuth(a=>({...a,err:"Username and password required"}));
+    if(un.length<3) return setAuth(a=>({...a,err:"Username must be at least 3 characters"}));
+    const key=`u:${un}`;
+    if(mode==="reg"){
+      if(p.length<6) return setAuth(a=>({...a,err:"Password must be at least 6 characters"}));
+      if(p!==p2) return setAuth(a=>({...a,err:"Passwords don't match"}));
+      if(DB.get(key)) return setAuth(a=>({...a,err:"Username already taken"}));
+      DB.set(key,{pw:hashPw(p),ak:"",created:Date.now()});
+      DB.set("_sess",{u:un});
+      setUser(un);trRef.current=[];setTruckers([]);setPage("setup");
+    }else{
+      const ud=DB.get(key);
+      if(!ud||ud.pw!==hashPw(p)) return setAuth(a=>({...a,err:"Incorrect username or password"}));
+      DB.set("_sess",{u:un});
+      const trs=DB.get(`t:${un}`)||[];
+      trRef.current=trs;
+      setUser(un);setApiKey(ud.ak||"");setTruckers(trs);
+      setPage(ud.ak?"dash":"setup");
+    }
+  };
+
+  const logout=()=>{
+    DB.del("_sess");
+    setUser(null);trRef.current=[];setTruckers([]);setApiKey("");
+    setPage("auth");setAuth({mode:"login",u:"",p:"",p2:"",err:""});
+  };
+
+  // API KEY SETUP
+  const saveKey=()=>{
+    if(!apiInp.trim()) return msg("Enter your FMCSA web key","err");
+    const ud=DB.get(`u:${user}`)||{};
+    ud.ak=apiInp.trim();
+    DB.set(`u:${user}`,ud);
+    setApiKey(apiInp.trim());setPage("dash");msg("API key saved ✓","ok");
+  };
+
+  // FMCSA API CALL
+  const fetchDOT=async(dotNum)=>{
+    try{
+      const res=await fetch(`https://mobile.fmcsa.dot.gov/qc/services/carriers/${dotNum}?webKey=${apiKey}`,{method:"GET"});
+      if(!res.ok) return null;
+      const data=await res.json();
+      const c=data?.content?.carrier;
+      if(!c||!c.dotNumber) return null;
+      return{
+        dot:String(c.dotNumber),
+        name:(c.legalName||c.dbaName||"Unknown").trim(),
+        dba:(c.dbaName||"").trim(),
+        phone:formatPhone(c.telephone||""),
+        city:(c.phyCity||"").trim(),
+        state:(c.phyState||"").trim().toUpperCase(),
+        zip:(c.phyZipcode||"").trim(),
+        street:(c.phyStreet||"").trim(),
+        trucks:parseInt(c.totalTrucks)||0,
+        drivers:parseInt(c.totalDrivers)||0,
+        ts:Date.now()
+      };
+    }catch(e){
+      return null;
+    }
+  };
+
+  // ADD / UPDATE carrier in DB
+  const addCarrier=(carrier)=>{
+    const prev=trRef.current;
+    const next=prev.find(t=>t.dot===carrier.dot)
+      ?prev.map(t=>t.dot===carrier.dot?{...t,...carrier}:t)
+      :[carrier,...prev];
+    trRef.current=next;
+    setTruckers([...next]);
+    DB.set(`t:${user}`,next);
+  };
+
+  // SINGLE LOOKUP
+  const lookupOne=async()=>{
+    const d=dotVal.trim();
+    if(!d||isNaN(d)) return msg("Enter a valid USDOT number","err");
+    setLooking(true);msg(`Looking up DOT #${d}…`,"info");
+    const c=await fetchDOT(d);
+    setLooking(false);
+    if(!c) return msg(`No active carrier found for DOT #${d}. Check your API key or try another number.`,"err");
+    addCarrier(c);
+    msg(`✓ Added: ${c.name}`,"ok");
+    setDotVal("");
+  };
+
+  // AUTO SCAN
+  const startScan=async()=>{
+    const s=parseInt(scan.s),e=parseInt(scan.e);
+    if(isNaN(s)||isNaN(e)||s>e||s<1) return msg("Enter a valid DOT range","err");
+    if(e-s>500) return msg("Max 500 DOT numbers per scan to avoid rate limiting","err");
+    scanRef.current=true;
+    const tot=e-s+1;
+    setScan(v=>({...v,on:true,cur:s,tot,found:0}));
+    let found=0;
+    for(let d=s;d<=e;d++){
+      if(!scanRef.current) break;
+      setScan(v=>({...v,cur:d,found}));
+      const c=await fetchDOT(d);
+      if(c){found++;addCarrier(c);setScan(v=>({...v,found}));}
+      await new Promise(r=>setTimeout(r,300)); // Rate limit: ~3 req/sec
+    }
+    scanRef.current=false;
+    setScan(v=>({...v,on:false}));
+    msg(`Scan complete — ${found} carrier${found!==1?"s":""} added`,"ok");
+  };
+
+  const stopScan=()=>{scanRef.current=false;};
+
+  // FILTER & SORT
+  const filtered=truckers
+    .filter(t=>{
+      if(filter.state!=="ALL"&&t.state!==filter.state) return false;
+      const mn=parseInt(filter.minT)||0,mx=parseInt(filter.maxT)||1e9;
+      if(t.trucks<mn||t.trucks>mx) return false;
+      if(filter.q){
+        const q=filter.q.toLowerCase();
+        return t.name.toLowerCase().includes(q)||
+          t.dot.includes(q)||
+          t.city.toLowerCase().includes(q)||
+          (t.phone||"").includes(filter.q)||
+          (t.state||"").toLowerCase()===q;
+      }
+      return true;
+    })
+    .sort((a,b)=>{
+      let av=a[sf],bv=b[sf];
+      if(sf==="trucks"||sf==="drivers"||sf==="ts") return((Number(av)||0)-(Number(bv)||0))*sd;
+      return String(av||"").localeCompare(String(bv||""))*sd;
+    });
+
+  // DELETE
+  const delCarrier=(dot)=>{
+    const next=trRef.current.filter(t=>t.dot!==dot);
+    trRef.current=next;setTruckers([...next]);
+    DB.set(`t:${user}`,next);setDel(null);
+    msg("Carrier removed","ok");
+  };
+
+  // EXPORT
+  const exportCSV=()=>{
+    const h=["DOT Number","Company Name","DBA","Phone","Street","City","State","ZIP","Total Trucks","Total Drivers","Added"];
+    const rows=filtered.map(t=>[t.dot,t.name,t.dba,t.phone,t.street,t.city,t.state,t.zip,t.trucks,t.drivers,new Date(t.ts).toLocaleDateString()]);
+    const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=Object.assign(document.createElement("a"),{
+      href:URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"})),
+      download:`truckers_${new Date().toISOString().slice(0,10)}.csv`
+    });
+    a.click();URL.revokeObjectURL(a.href);
+  };
+
+  const sortBy=f=>{if(sf===f)setSd(d=>-d);else{setSf(f);setSd(1)}};
+  const pct=scan.on&&scan.tot>0?Math.min(100,Math.round(((scan.cur-parseInt(scan.s||"0"))/scan.tot)*100)):0;
+  const totalTrucks=truckers.reduce((s,t)=>s+(t.trucks||0),0);
+  const stateCount=[...new Set(truckers.map(t=>t.state).filter(Boolean))].length;
+
+  // ──────────────────────────────────────────────
+  // SCREENS
+  // ──────────────────────────────────────────────
+
+  if(page==="loading") return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh"}}>
+      <div style={{fontSize:12,color:"var(--text3)",fontFamily:"'Courier New',monospace"}}>Loading…</div>
+    </div>
+  );
+
+  if(page==="auth") return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"1rem",background:"var(--bg)"}}>
+      <div className="card" style={{width:340,maxWidth:"100%",padding:"1.75rem"}}>
+        <div style={{marginBottom:"1.5rem"}}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:".2em",textTransform:"uppercase",color:"var(--amber-d)",marginBottom:10,fontFamily:"'Courier New',monospace"}}>
+            ◈ TRUCKER INTEL
+          </div>
+          <h1 style={{fontSize:22,fontWeight:600,color:"var(--text)",marginBottom:4}}>
+            {auth.mode==="login"?"Sign in":"Create account"}
+          </h1>
+          <p style={{fontSize:12,color:"var(--text3)"}}>USDOT carrier intelligence platform</p>
+        </div>
+
+        <div style={{marginBottom:12}}>
+          <label className="lbl">Username</label>
+          <input className="inp" placeholder="your_username" autoFocus value={auth.u}
+            onChange={e=>setAuth(a=>({...a,u:e.target.value,err:""}))}
+            onKeyDown={e=>e.key==="Enter"&&authSubmit()}/>
+        </div>
+        <div style={{marginBottom:12}}>
+          <label className="lbl">Password</label>
+          <input className="inp" type="password" placeholder="••••••••" value={auth.p}
+            onChange={e=>setAuth(a=>({...a,p:e.target.value,err:""}))}
+            onKeyDown={e=>e.key==="Enter"&&authSubmit()}/>
+        </div>
+        {auth.mode==="reg"&&(
+          <div style={{marginBottom:12}}>
+            <label className="lbl">Confirm password</label>
+            <input className="inp" type="password" placeholder="••••••••" value={auth.p2}
+              onChange={e=>setAuth(a=>({...a,p2:e.target.value,err:""}))}
+              onKeyDown={e=>e.key==="Enter"&&authSubmit()}/>
+          </div>
+        )}
+        {auth.err&&<div className="err-msg">{auth.err}</div>}
+
+        <button className="btn btn-amber" style={{width:"100%",padding:"9px 0",fontSize:13,marginBottom:12}} onClick={authSubmit}>
+          {auth.mode==="login"?"Sign in →":"Create account →"}
+        </button>
+        <div style={{textAlign:"center",fontSize:12,color:"var(--text3)"}}>
+          {auth.mode==="login"?"No account? ":"Already have an account? "}
+          <button style={{background:"none",border:"none",color:"var(--amber-d)",cursor:"pointer",fontSize:12,fontWeight:600}}
+            onClick={()=>setAuth(a=>({...a,mode:a.mode==="login"?"reg":"login",err:""}))}>
+            {auth.mode==="login"?"Register":"Sign in"}
+          </button>
+        </div>
+        <div style={{marginTop:16,fontSize:10,color:"var(--text3)",textAlign:"center",lineHeight:1.6}}>
+          Your data is stored locally in your browser.
+        </div>
+      </div>
+      {toast&&<div className={`toast toast-${toast.type}`}>{toast.text}</div>}
+    </div>
+  );
+
+  if(page==="setup") return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"1rem",background:"var(--bg)"}}>
+      <div className="card" style={{width:440,maxWidth:"100%",padding:"1.75rem"}}>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:".2em",textTransform:"uppercase",color:"var(--amber-d)",marginBottom:10,fontFamily:"'Courier New',monospace"}}>
+          ◈ TRUCKER INTEL — SETUP
+        </div>
+        <h1 style={{fontSize:20,fontWeight:600,marginBottom:8}}>FMCSA API Key Required</h1>
+        <p style={{fontSize:12,color:"var(--text2)",lineHeight:1.7,marginBottom:14}}>
+          Carrier data is pulled live from the <strong>FMCSA SAFER Mobile API</strong>. 
+          You need a free API web key to use this application.
+        </p>
+        <div className="help-box" style={{marginBottom:16}}>
+          <strong>How to get your free key:</strong><br/>
+          1. Go to <a href="https://ai.fmcsa.dot.gov/SMS/Snapshot/KeyRegister.aspx" target="_blank">ai.fmcsa.dot.gov → SMS → Key Register</a><br/>
+          2. Enter your name and email address<br/>
+          3. Your key will be emailed to you within minutes<br/><br/>
+          <strong>API base URL:</strong><br/>
+          <span style={{fontFamily:"'Courier New',monospace",fontSize:10}}>
+            https://mobile.fmcsa.dot.gov/qc/services/carriers/{"{"}dotNumber{"}"}?webKey={"{"}yourKey{"}"}
+          </span>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label className="lbl">Your FMCSA Web Key</label>
+          <input className="inp mono" placeholder="Paste your web key here…" value={apiInp}
+            onChange={e=>setApiInp(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&saveKey()}/>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button className="btn" onClick={logout}>Log out</button>
+          <button className="btn btn-amber" onClick={saveKey}>Save &amp; Open Dashboard →</button>
+        </div>
+      </div>
+      {toast&&<div className={`toast toast-${toast.type}`}>{toast.text}</div>}
+    </div>
+  );
+
+  // ──────────────────────────────────────────────
+  // DASHBOARD
+  // ──────────────────────────────────────────────
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100vh",background:"var(--bg)"}}>
+
+      {/* HEADER */}
+      <div style={{background:"var(--surface)",borderBottom:"0.5px solid var(--border)",padding:"0 1.25rem",display:"flex",alignItems:"center",gap:12,height:48,flexShrink:0}}>
+        <div style={{fontFamily:"'Courier New',monospace",fontSize:12,fontWeight:700,color:"var(--amber-d)",letterSpacing:".14em"}}>◈ TRUCKER INTEL</div>
+        <div style={{width:"0.5px",height:16,background:"var(--border)"}}/>
+        <div style={{fontSize:11,color:"var(--text3)"}}>USDOT Carrier Database</div>
+        <div style={{flex:1}}/>
+        <div style={{fontSize:11,color:"var(--text3)",fontFamily:"'Courier New',monospace"}}>{user}</div>
+        <button className="btn btn-sm" onClick={()=>{setPage("setup");setApiInp(apiKey)}}>Change API Key</button>
+        <button className="btn btn-sm" onClick={logout}>Sign out</button>
+      </div>
+
+      <div style={{display:"flex",flex:1,gap:"0.875rem",padding:"0.875rem",overflow:"hidden"}}>
+
+        {/* ── SIDEBAR ── */}
+        <div className="sidebar">
+
+          {/* Stats */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            {[["Records",truckers.length.toLocaleString()],["Filtered",filtered.length.toLocaleString()],["Trucks",totalTrucks.toLocaleString()],["States",stateCount]].map(([l,v])=>(
+              <div key={l} className="stat">
+                <div className="stat-v">{v}</div>
+                <div className="stat-l">{l}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Lookup / Scan panel */}
+          <div className="card" style={{padding:"0.875rem"}}>
+            <div style={{display:"flex",borderBottom:"0.5px solid var(--border)",marginBottom:12}}>
+              <button className={`tab ${tab==="lookup"?"active":""}`} onClick={()=>setTab("lookup")}>Single DOT</button>
+              <button className={`tab ${tab==="scan"?"active":""}`} onClick={()=>setTab("scan")}>Auto scan</button>
+            </div>
+
+            {tab==="lookup"&&(
+              <div>
+                <label className="lbl">USDOT Number</label>
+                <div style={{display:"flex",gap:6,marginBottom:8}}>
+                  <input className="inp mono" style={{flex:1}} placeholder="e.g. 3874521" value={dotVal}
+                    onChange={e=>setDotVal(e.target.value)}
+                    onKeyDown={e=>e.key==="Enter"&&lookupOne()}
+                    disabled={looking}/>
+                  <button className="btn btn-amber" onClick={lookupOne} disabled={looking}>
+                    {looking?"…":"Go"}
+                  </button>
+                </div>
+                <p style={{fontSize:10,color:"var(--text3)",lineHeight:1.65}}>
+                  Fetch any carrier's info from FMCSA SAFER instantly. Duplicate DOT numbers are updated, not duplicated.
+                </p>
+              </div>
+            )}
+
+            {tab==="scan"&&(
+              <div>
+                <p style={{fontSize:10,color:"var(--text3)",lineHeight:1.65,marginBottom:10}}>
+                  Scan a sequential range of USDOT numbers automatically. Carriers with active MC numbers will be added. Max 500 per run.
+                </p>
+                <div style={{display:"flex",gap:6,marginBottom:8}}>
+                  <div style={{flex:1}}>
+                    <label className="lbl">Start DOT</label>
+                    <input className="inp mono" placeholder="e.g. 3870000" value={scan.s}
+                      disabled={scan.on} onChange={e=>setScan(v=>({...v,s:e.target.value}))}/>
+                  </div>
+                  <div style={{flex:1}}>
+                    <label className="lbl">End DOT</label>
+                    <input className="inp mono" placeholder="e.g. 3870500" value={scan.e}
+                      disabled={scan.on} onChange={e=>setScan(v=>({...v,e:e.target.value}))}/>
+                  </div>
+                </div>
+                {scan.on&&(
+                  <div style={{marginBottom:10}}>
+                    <div className="pb"><div className="pbf" style={{width:`${pct}%`}}/></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--text3)",fontFamily:"'Courier New',monospace"}}>
+                      <span>Scanning DOT #{scan.cur}</span>
+                      <span style={{color:"var(--amber-d)",fontWeight:600}}>{scan.found} found · {pct}%</span>
+                    </div>
+                  </div>
+                )}
+                {!scan.on
+                  ?<button className="btn btn-amber" style={{width:"100%"}} onClick={startScan}>▶ Start scan</button>
+                  :<button className="btn btn-red" style={{width:"100%"}} onClick={stopScan}>■ Stop scan</button>
+                }
+              </div>
+            )}
+          </div>
+
+          {/* Filter panel */}
+          <div className="card" style={{padding:"0.875rem"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+              <span style={{fontSize:12,fontWeight:600,color:"var(--text)"}}>Filters</span>
+              <button className="btn btn-sm" style={{fontSize:10}} onClick={()=>setFilter({state:"ALL",minT:"",maxT:"",q:""})}>Clear all</button>
+            </div>
+            <div style={{marginBottom:8}}>
+              <label className="lbl">Search</label>
+              <input className="inp" placeholder="Name, DOT #, city, phone…" value={filter.q}
+                onChange={e=>setFilter(f=>({...f,q:e.target.value}))}/>
+            </div>
+            <div style={{marginBottom:8}}>
+              <label className="lbl">State</label>
+              <select className="inp" value={filter.state} onChange={e=>setFilter(f=>({...f,state:e.target.value}))}>
+                <option value="ALL">All states</option>
+                {STATES.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <div style={{flex:1}}>
+                <label className="lbl">Min trucks</label>
+                <input className="inp mono" type="number" min="0" placeholder="0" value={filter.minT}
+                  onChange={e=>setFilter(f=>({...f,minT:e.target.value}))}/>
+              </div>
+              <div style={{flex:1}}>
+                <label className="lbl">Max trucks</label>
+                <input className="inp mono" type="number" min="0" placeholder="∞" value={filter.maxT}
+                  onChange={e=>setFilter(f=>({...f,maxT:e.target.value}))}/>
+              </div>
+            </div>
+          </div>
+
+          {/* Info box */}
+          <div className="help-box">
+            <strong>About this app</strong><br/>
+            Data is fetched in real-time from <a href="https://mobile.fmcsa.dot.gov" target="_blank">FMCSA SAFER</a>. Records are saved locally in your browser's storage. Use <strong>Export CSV</strong> to back up your list at any time.
+          </div>
+        </div>
+
+        {/* ── MAIN TABLE ── */}
+        <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column"}}>
+          <div className="card" style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",padding:0}}>
+
+            {/* Table toolbar */}
+            <div style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:8,borderBottom:"0.5px solid var(--border)",flexShrink:0}}>
+              <span style={{fontSize:12,fontWeight:600,color:"var(--text)",flex:1}}>
+                {filtered.length.toLocaleString()} carrier{filtered.length!==1?"s":""}
+                {truckers.length!==filtered.length&&
+                  <span style={{color:"var(--text3)",fontWeight:400}}> (of {truckers.length.toLocaleString()} total)</span>}
+              </span>
+              <button className="btn btn-sm" onClick={exportCSV} disabled={filtered.length===0}>
+                ↓ Export CSV
+              </button>
+            </div>
+
+            {/* Table */}
+            <div style={{flex:1,overflow:"auto"}}>
+              {filtered.length===0?(
+                <div style={{textAlign:"center",padding:"3.5rem 1rem",color:"var(--text3)",fontSize:12,lineHeight:2}}>
+                  {truckers.length===0
+                    ?<>No carriers in database.<br/>Enter a USDOT number above or run a range scan to get started.</>
+                    :"No carriers match the current filters."}
+                </div>
+              ):(
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      {[["dot","DOT #"],["name","Company"],["phone","Phone"],["city","City"],["state","ST"],["trucks","Trucks"],["drivers","Drivers"],["ts","Added"]].map(([f,label])=>(
+                        <th key={f} onClick={()=>sortBy(f)} title={`Sort by ${label}`}>
+                          {label} {sf===f?(sd===1?"↑":"↓"):<span style={{opacity:.3}}>⇅</span>}
+                        </th>
+                      ))}
+                      <th style={{cursor:"default"}}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(t=>(
+                      <tr key={t.dot}>
+                        <td><span className="dot-id">#{t.dot}</span></td>
+                        <td style={{maxWidth:200}}>
+                          <div style={{fontWeight:600,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</div>
+                          {t.dba&&t.dba!==t.name&&
+                            <div style={{fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>DBA: {t.dba}</div>}
+                        </td>
+                        <td style={{fontFamily:"'Courier New',monospace",whiteSpace:"nowrap"}}>{t.phone||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                        <td>{t.city||<span style={{color:"var(--text3)"}}>—</span>}</td>
+                        <td>
+                          {t.state
+                            ?<span className="tag tag-amber">{t.state}</span>
+                            :<span style={{color:"var(--text3)"}}>—</span>}
+                        </td>
+                        <td>
+                          <span className={`tag ${t.trucks>0?"tag-green":"tag-gray"}`}>
+                            {t.trucks.toLocaleString()}
+                          </span>
+                        </td>
+                        <td style={{fontFamily:"'Courier New',monospace"}}>{t.drivers.toLocaleString()}</td>
+                        <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{new Date(t.ts).toLocaleDateString()}</td>
+                        <td>
+                          {del===t.dot?(
+                            <div style={{display:"flex",gap:4,whiteSpace:"nowrap"}}>
+                              <button className="btn btn-sm btn-red" onClick={()=>delCarrier(t.dot)}>Delete</button>
+                              <button className="btn btn-sm" onClick={()=>setDel(null)}>Cancel</button>
+                            </div>
+                          ):(
+                            <button className="btn btn-sm" style={{opacity:.35,fontSize:13,padding:"2px 8px"}} onClick={()=>setDel(t.dot)} title="Remove carrier">✕</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {toast&&<div className={`toast toast-${toast.type}`}>{toast.text}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
