@@ -51,7 +51,7 @@
   .tag-green{background:var(--green-bg);color:var(--green-text)}
   .tag-gray{background:var(--surface2);color:var(--text3)}
   @media(prefers-color-scheme:dark){.tag-amber{color:#FAC775}}
-  .toast{position:fixed;bottom:20px;right:20px;z-index:9999;padding:9px 16px;border-radius:var(--r);font-size:12px;font-weight:500;border:0.5px solid;animation:ti .2s ease;max-width:300px;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
+  .toast{position:fixed;bottom:20px;right:20px;z-index:9999;padding:9px 16px;border-radius:var(--r);font-size:12px;font-weight:500;border:0.5px solid;animation:ti .2s ease;max-width:320px;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
   @keyframes ti{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   .toast-ok{background:var(--success-bg);border-color:var(--success-border);color:var(--success-text)}
   .toast-err{background:var(--red-bg);border-color:var(--red-border);color:var(--red-text)}
@@ -75,6 +75,7 @@
   ::-webkit-scrollbar-track{background:transparent}
   ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
   .sidebar{width:265px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-bottom:1rem}
+  .phone-none{color:var(--text3);font-style:italic;font-size:11px}
 </style>
 </head>
 <body>
@@ -97,12 +98,15 @@ const DB={
   del(k){try{localStorage.removeItem(k)}catch{}}
 };
 
+// More robust phone formatter
 function formatPhone(raw){
   if(!raw)return"";
-  const d=raw.replace(/\D/g,"");
+  const d=raw.replace(/\D/g,""); // Remove anything that isn't a number
   if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
   if(d.length===11&&d[0]==="1")return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
-  return raw;
+  // If it's an unusual format but has numbers, just return the original input
+  if(d.length > 0) return raw; 
+  return "";
 }
 
 function App(){
@@ -125,10 +129,9 @@ function App(){
   const msg=(text,type="ok")=>{
     setToast({text,type});
     if(tRef.current)clearTimeout(tRef.current);
-    tRef.current=setTimeout(()=>setToast(null),3500);
+    tRef.current=setTimeout(()=>setToast(null),4000);
   };
 
-  // Check login on load
   useEffect(()=>{
     const sess=DB.get("_sess");
     if(sess&&sess.u){
@@ -179,20 +182,28 @@ function App(){
 
   const fetchDOT=async(dotNum)=>{
     try{
-      // Uses the hardcoded API_KEY variable
       const res=await fetch(`https://mobile.fmcsa.dot.gov/qc/services/carriers/${dotNum}?webKey=${API_KEY}`,{method:"GET"});
       if(!res.ok) return null;
       const data=await res.json();
       const c=data?.content?.carrier;
       if(!c||!c.dotNumber) return null;
 
-      const rawPhone = c.phoneNumber || c.telephone || "";
+      // --- INACTIVE CHECK ---
+      // If the carrier is not allowed to operate, or marked Inactive (I) or Out of Service (O)
+      if(c.allowedToOperate === "N" || c.statusCode === "I" || c.statusCode === "O") {
+        return { error: "inactive", name: c.legalName || c.dbaName || "Unknown Carrier" };
+      }
+
+      // --- PHONE NUMBER FIX ---
+      // Try telephone first, then phoneNumber, then phone.
+      const rawPhone = c.telephone || c.phoneNumber || c.phone || "";
+      const formattedPhone = formatPhone(rawPhone);
 
       return{
         dot:String(c.dotNumber),
         name:(c.legalName||c.dbaName||"Unknown").trim(),
         dba:(c.dbaName||"").trim(),
-        phone:formatPhone(rawPhone),
+        phone: formattedPhone || "No Phone Listed",
         city:(c.phyCity||"").trim(),
         state:(c.phyState||"").trim().toUpperCase(),
         zip:(c.phyZipcode||"").trim(),
@@ -220,9 +231,17 @@ function App(){
     const d=dotVal.trim();
     if(!d||isNaN(d)) return msg("Enter a valid USDOT number","err");
     setLooking(true);msg(`Looking up DOT #${d}…`,"info");
+    
     const c=await fetchDOT(d);
     setLooking(false);
-    if(!c) return msg(`No active carrier found for DOT #${d}.`,"err");
+    
+    if(!c) return msg(`No record found for DOT #${d}.`,"err");
+    
+    // Alert the user if the DOT is inactive
+    if(c.error === "inactive") {
+      return msg(`DOT #${d} (${c.name}) is INACTIVE or Out-Of-Service. Skipped.`,"err");
+    }
+    
     addCarrier(c);
     msg(`✓ Added: ${c.name}`,"ok");
     setDotVal("");
@@ -236,16 +255,24 @@ function App(){
     const tot=e-s+1;
     setScan(v=>({...v,on:true,cur:s,tot,found:0}));
     let found=0;
+    
     for(let d=s;d<=e;d++){
       if(!scanRef.current) break;
       setScan(v=>({...v,cur:d,found}));
+      
       const c=await fetchDOT(d);
-      if(c){found++;addCarrier(c);setScan(v=>({...v,found}));}
+      
+      // Only add to list if it exists AND is not inactive
+      if(c && !c.error){
+        found++;
+        addCarrier(c);
+        setScan(v=>({...v,found}));
+      }
       await new Promise(r=>setTimeout(r,300));
     }
     scanRef.current=false;
     setScan(v=>({...v,on:false}));
-    msg(`Scan complete — ${found} found`,"ok");
+    msg(`Scan complete — ${found} active carriers found`,"ok");
   };
 
   const stopScan=()=>{scanRef.current=false;};
@@ -364,7 +391,7 @@ function App(){
                 {scan.on?(
                   <div style={{marginBottom:10}}>
                     <div className="pb"><div className="pbf" style={{width:`${pct}%`}}/></div>
-                    <div style={{fontSize:10,color:"var(--text3)"}}>Found: {scan.found} · {pct}%</div>
+                    <div style={{fontSize:10,color:"var(--text3)"}}>Found: {scan.found} active · {pct}%</div>
                     <button className="btn btn-red" style={{width:"100%",marginTop:8}} onClick={stopScan}>Stop</button>
                   </div>
                 ):<button className="btn btn-amber" style={{width:"100%"}} onClick={startScan}>Start Scan</button>}
@@ -380,7 +407,7 @@ function App(){
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div className="card" style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             <div style={{padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"0.5px solid var(--border)"}}>
-              <span style={{fontSize:12,fontWeight:600}}>{filtered.length} Carriers</span>
+              <span style={{fontSize:12,fontWeight:600}}>{filtered.length} Active Carriers</span>
               <button className="btn btn-sm" onClick={exportCSV}>Export CSV</button>
             </div>
             <div style={{flex:1,overflow:"auto"}}>
@@ -402,7 +429,9 @@ function App(){
                     <tr key={t.dot}>
                       <td><span className="dot-id">#{t.dot}</span></td>
                       <td style={{fontWeight:600}}>{t.name}</td>
-                      <td style={{fontFamily:"'Courier New',monospace"}}>{t.phone || "—"}</td>
+                      <td style={{fontFamily:"'Courier New',monospace"}}>
+                        {t.phone === "No Phone Listed" ? <span className="phone-none">No Phone Listed</span> : t.phone}
+                      </td>
                       <td>{t.city}</td>
                       <td><span className="tag tag-amber">{t.state}</span></td>
                       <td><span className="tag tag-green">{t.trucks}</span></td>
