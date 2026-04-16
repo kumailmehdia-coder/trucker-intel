@@ -75,26 +75,22 @@
   ::-webkit-scrollbar-track{background:transparent}
   ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
   .sidebar{width:265px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-bottom:1rem}
-  .help-box{background:var(--surface2);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.65}
-  .help-box strong{color:var(--text)}
-  .help-box a{color:var(--amber-d)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useRef,useCallback}=React;
+const {useState,useEffect,useRef}=React;
 
-const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+// Hardcoded API Key
+const API_KEY = "2391d610f4ab3253f9d3b724cbb29bb7ae1deb85";
 
-// Simple one-way hash (not cryptographic — client-side demo only)
 function hashPw(s){
   let h=5381;
   for(let i=0;i<s.length;i++) h=Math.imul(h,33)^s.charCodeAt(i);
   return(h>>>0).toString(16);
 }
 
-// LocalStorage-backed "database"
 const DB={
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch{return false}},
   get(k){try{const r=localStorage.getItem(k);return r?JSON.parse(r):null}catch{return null}},
@@ -112,18 +108,15 @@ function formatPhone(raw){
 function App(){
   const [page,setPage]=useState("loading");
   const [user,setUser]=useState(null);
-  const [apiKey,setApiKey]=useState("");
   const [truckers,setTruckers]=useState([]);
   const [filter,setFilter]=useState({state:"ALL",minT:"",maxT:"",q:""});
   const [auth,setAuth]=useState({mode:"login",u:"",p:"",p2:"",err:""});
   const [dotVal,setDotVal]=useState("");
   const [scan,setScan]=useState({on:false,s:"",e:"",cur:0,tot:0,found:0});
-  const [apiInp,setApiInp]=useState("");
   const [toast,setToast]=useState(null);
   const [tab,setTab]=useState("lookup");
   const [sf,setSf]=useState("ts");
   const [sd,setSd]=useState(-1);
-  const [del,setDel]=useState(null);
   const [looking,setLooking]=useState(false);
   const scanRef=useRef(false);
   const tRef=useRef(null);
@@ -135,7 +128,7 @@ function App(){
     tRef.current=setTimeout(()=>setToast(null),3500);
   };
 
-  // Init: check session
+  // Check login on load
   useEffect(()=>{
     const sess=DB.get("_sess");
     if(sess&&sess.u){
@@ -143,66 +136,63 @@ function App(){
       if(ud){
         const trs=DB.get(`t:${sess.u}`)||[];
         trRef.current=trs;
-        setUser(sess.u);setApiKey(ud.ak||"");setTruckers(trs);
-        setPage(ud.ak?"dash":"setup");return;
+        setUser(sess.u);
+        setTruckers(trs);
+        setPage("dash"); 
+        return;
       }
     }
     setPage("auth");
   },[]);
 
-  // AUTH
   const authSubmit=()=>{
     const{mode,u,p,p2}=auth;
     const un=u.trim().toLowerCase();
     if(!un||!p) return setAuth(a=>({...a,err:"Username and password required"}));
-    if(un.length<3) return setAuth(a=>({...a,err:"Username must be at least 3 characters"}));
     const key=`u:${un}`;
     if(mode==="reg"){
       if(p.length<6) return setAuth(a=>({...a,err:"Password must be at least 6 characters"}));
       if(p!==p2) return setAuth(a=>({...a,err:"Passwords don't match"}));
       if(DB.get(key)) return setAuth(a=>({...a,err:"Username already taken"}));
-      DB.set(key,{pw:hashPw(p),ak:"",created:Date.now()});
+      
+      DB.set(key,{pw:hashPw(p),created:Date.now()});
       DB.set("_sess",{u:un});
-      setUser(un);trRef.current=[];setTruckers([]);setPage("setup");
+      setUser(un);trRef.current=[];setTruckers([]);
+      setPage("dash");
     }else{
       const ud=DB.get(key);
       if(!ud||ud.pw!==hashPw(p)) return setAuth(a=>({...a,err:"Incorrect username or password"}));
+      
       DB.set("_sess",{u:un});
       const trs=DB.get(`t:${un}`)||[];
       trRef.current=trs;
-      setUser(un);setApiKey(ud.ak||"");setTruckers(trs);
-      setPage(ud.ak?"dash":"setup");
+      setUser(un);setTruckers(trs);
+      setPage("dash");
     }
   };
 
   const logout=()=>{
     DB.del("_sess");
-    setUser(null);trRef.current=[];setTruckers([]);setApiKey("");
+    setUser(null);trRef.current=[];setTruckers([]);
     setPage("auth");setAuth({mode:"login",u:"",p:"",p2:"",err:""});
   };
 
-  // API KEY SETUP
-  const saveKey=()=>{
-    if(!apiInp.trim()) return msg("Enter your FMCSA web key","err");
-    const ud=DB.get(`u:${user}`)||{};
-    ud.ak=apiInp.trim();
-    DB.set(`u:${user}`,ud);
-    setApiKey(apiInp.trim());setPage("dash");msg("API key saved ✓","ok");
-  };
-
-  // FMCSA API CALL
   const fetchDOT=async(dotNum)=>{
     try{
-      const res=await fetch(`https://mobile.fmcsa.dot.gov/qc/services/carriers/${dotNum}?webKey=${apiKey}`,{method:"GET"});
+      // Uses the hardcoded API_KEY variable
+      const res=await fetch(`https://mobile.fmcsa.dot.gov/qc/services/carriers/${dotNum}?webKey=${API_KEY}`,{method:"GET"});
       if(!res.ok) return null;
       const data=await res.json();
       const c=data?.content?.carrier;
       if(!c||!c.dotNumber) return null;
+
+      const rawPhone = c.phoneNumber || c.telephone || "";
+
       return{
         dot:String(c.dotNumber),
         name:(c.legalName||c.dbaName||"Unknown").trim(),
         dba:(c.dbaName||"").trim(),
-        phone:formatPhone(c.telephone||""),
+        phone:formatPhone(rawPhone),
         city:(c.phyCity||"").trim(),
         state:(c.phyState||"").trim().toUpperCase(),
         zip:(c.phyZipcode||"").trim(),
@@ -216,7 +206,6 @@ function App(){
     }
   };
 
-  // ADD / UPDATE carrier in DB
   const addCarrier=(carrier)=>{
     const prev=trRef.current;
     const next=prev.find(t=>t.dot===carrier.dot)
@@ -227,20 +216,18 @@ function App(){
     DB.set(`t:${user}`,next);
   };
 
-  // SINGLE LOOKUP
   const lookupOne=async()=>{
     const d=dotVal.trim();
     if(!d||isNaN(d)) return msg("Enter a valid USDOT number","err");
     setLooking(true);msg(`Looking up DOT #${d}…`,"info");
     const c=await fetchDOT(d);
     setLooking(false);
-    if(!c) return msg(`No active carrier found for DOT #${d}. Check your API key or try another number.`,"err");
+    if(!c) return msg(`No active carrier found for DOT #${d}.`,"err");
     addCarrier(c);
     msg(`✓ Added: ${c.name}`,"ok");
     setDotVal("");
   };
 
-  // AUTO SCAN
   const startScan=async()=>{
     const s=parseInt(scan.s),e=parseInt(scan.e);
     if(isNaN(s)||isNaN(e)||s>e||s<1) return msg("Enter a valid DOT range","err");
@@ -254,16 +241,15 @@ function App(){
       setScan(v=>({...v,cur:d,found}));
       const c=await fetchDOT(d);
       if(c){found++;addCarrier(c);setScan(v=>({...v,found}));}
-      await new Promise(r=>setTimeout(r,300)); // Rate limit: ~3 req/sec
+      await new Promise(r=>setTimeout(r,300));
     }
     scanRef.current=false;
     setScan(v=>({...v,on:false}));
-    msg(`Scan complete — ${found} carrier${found!==1?"s":""} added`,"ok");
+    msg(`Scan complete — ${found} found`,"ok");
   };
 
   const stopScan=()=>{scanRef.current=false;};
 
-  // FILTER & SORT
   const filtered=truckers
     .filter(t=>{
       if(filter.state!=="ALL"&&t.state!==filter.state) return false;
@@ -285,15 +271,13 @@ function App(){
       return String(av||"").localeCompare(String(bv||""))*sd;
     });
 
-  // DELETE
   const delCarrier=(dot)=>{
     const next=trRef.current.filter(t=>t.dot!==dot);
     trRef.current=next;setTruckers([...next]);
-    DB.set(`t:${user}`,next);setDel(null);
+    DB.set(`t:${user}`,next);
     msg("Carrier removed","ok");
   };
 
-  // EXPORT
   const exportCSV=()=>{
     const h=["DOT Number","Company Name","DBA","Phone","Street","City","State","ZIP","Total Trucks","Total Drivers","Added"];
     const rows=filtered.map(t=>[t.dot,t.name,t.dba,t.phone,t.street,t.city,t.state,t.zip,t.trucks,t.drivers,new Date(t.ts).toLocaleDateString()]);
@@ -307,317 +291,131 @@ function App(){
 
   const sortBy=f=>{if(sf===f)setSd(d=>-d);else{setSf(f);setSd(1)}};
   const pct=scan.on&&scan.tot>0?Math.min(100,Math.round(((scan.cur-parseInt(scan.s||"0"))/scan.tot)*100)):0;
-  const totalTrucks=truckers.reduce((s,t)=>s+(t.trucks||0),0);
-  const stateCount=[...new Set(truckers.map(t=>t.state).filter(Boolean))].length;
 
-  // ──────────────────────────────────────────────
-  // SCREENS
-  // ──────────────────────────────────────────────
-
-  if(page==="loading") return(
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh"}}>
-      <div style={{fontSize:12,color:"var(--text3)",fontFamily:"'Courier New',monospace"}}>Loading…</div>
-    </div>
-  );
+  if(page==="loading") return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#888"}}>Loading…</div>;
 
   if(page==="auth") return(
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"1rem",background:"var(--bg)"}}>
       <div className="card" style={{width:340,maxWidth:"100%",padding:"1.75rem"}}>
         <div style={{marginBottom:"1.5rem"}}>
-          <div style={{fontSize:10,fontWeight:700,letterSpacing:".2em",textTransform:"uppercase",color:"var(--amber-d)",marginBottom:10,fontFamily:"'Courier New',monospace"}}>
-            ◈ TRUCKER INTEL
-          </div>
-          <h1 style={{fontSize:22,fontWeight:600,color:"var(--text)",marginBottom:4}}>
-            {auth.mode==="login"?"Sign in":"Create account"}
-          </h1>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:".2em",textTransform:"uppercase",color:"var(--amber-d)",marginBottom:10,fontFamily:"'Courier New',monospace"}}>◈ TRUCKER INTEL</div>
+          <h1 style={{fontSize:22,fontWeight:600,color:"var(--text)",marginBottom:4}}>{auth.mode==="login"?"Sign in":"Create account"}</h1>
           <p style={{fontSize:12,color:"var(--text3)"}}>USDOT carrier intelligence platform</p>
         </div>
-
         <div style={{marginBottom:12}}>
           <label className="lbl">Username</label>
-          <input className="inp" placeholder="your_username" autoFocus value={auth.u}
-            onChange={e=>setAuth(a=>({...a,u:e.target.value,err:""}))}
-            onKeyDown={e=>e.key==="Enter"&&authSubmit()}/>
+          <input className="inp" placeholder="your_username" value={auth.u} onChange={e=>setAuth(a=>({...a,u:e.target.value,err:""}))}/>
         </div>
         <div style={{marginBottom:12}}>
           <label className="lbl">Password</label>
-          <input className="inp" type="password" placeholder="••••••••" value={auth.p}
-            onChange={e=>setAuth(a=>({...a,p:e.target.value,err:""}))}
-            onKeyDown={e=>e.key==="Enter"&&authSubmit()}/>
+          <input className="inp" type="password" placeholder="••••••••" value={auth.p} onChange={e=>setAuth(a=>({...a,p:e.target.value,err:""}))}/>
         </div>
         {auth.mode==="reg"&&(
           <div style={{marginBottom:12}}>
             <label className="lbl">Confirm password</label>
-            <input className="inp" type="password" placeholder="••••••••" value={auth.p2}
-              onChange={e=>setAuth(a=>({...a,p2:e.target.value,err:""}))}
-              onKeyDown={e=>e.key==="Enter"&&authSubmit()}/>
+            <input className="inp" type="password" placeholder="••••••••" value={auth.p2} onChange={e=>setAuth(a=>({...a,p2:e.target.value,err:""}))}/>
           </div>
         )}
         {auth.err&&<div className="err-msg">{auth.err}</div>}
-
-        <button className="btn btn-amber" style={{width:"100%",padding:"9px 0",fontSize:13,marginBottom:12}} onClick={authSubmit}>
-          {auth.mode==="login"?"Sign in →":"Create account →"}
-        </button>
+        <button className="btn btn-amber" style={{width:"100%",padding:"9px 0",marginBottom:12}} onClick={authSubmit}>{auth.mode==="login"?"Sign in →":"Create account →"}</button>
         <div style={{textAlign:"center",fontSize:12,color:"var(--text3)"}}>
           {auth.mode==="login"?"No account? ":"Already have an account? "}
-          <button style={{background:"none",border:"none",color:"var(--amber-d)",cursor:"pointer",fontSize:12,fontWeight:600}}
-            onClick={()=>setAuth(a=>({...a,mode:a.mode==="login"?"reg":"login",err:""}))}>
-            {auth.mode==="login"?"Register":"Sign in"}
-          </button>
-        </div>
-        <div style={{marginTop:16,fontSize:10,color:"var(--text3)",textAlign:"center",lineHeight:1.6}}>
-          Your data is stored locally in your browser.
+          <button style={{background:"none",border:"none",color:"var(--amber-d)",cursor:"pointer",fontWeight:600}} onClick={()=>setAuth(a=>({...a,mode:a.mode==="login"?"reg":"login",err:""}))}>{auth.mode==="login"?"Register":"Sign in"}</button>
         </div>
       </div>
       {toast&&<div className={`toast toast-${toast.type}`}>{toast.text}</div>}
     </div>
   );
 
-  if(page==="setup") return(
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"1rem",background:"var(--bg)"}}>
-      <div className="card" style={{width:440,maxWidth:"100%",padding:"1.75rem"}}>
-        <div style={{fontSize:10,fontWeight:700,letterSpacing:".2em",textTransform:"uppercase",color:"var(--amber-d)",marginBottom:10,fontFamily:"'Courier New',monospace"}}>
-          ◈ TRUCKER INTEL — SETUP
-        </div>
-        <h1 style={{fontSize:20,fontWeight:600,marginBottom:8}}>FMCSA API Key Required</h1>
-        <p style={{fontSize:12,color:"var(--text2)",lineHeight:1.7,marginBottom:14}}>
-          Carrier data is pulled live from the <strong>FMCSA SAFER Mobile API</strong>. 
-          You need a free API web key to use this application.
-        </p>
-        <div className="help-box" style={{marginBottom:16}}>
-          <strong>How to get your free key:</strong><br/>
-          1. Go to <a href="https://ai.fmcsa.dot.gov/SMS/Snapshot/KeyRegister.aspx" target="_blank">ai.fmcsa.dot.gov → SMS → Key Register</a><br/>
-          2. Enter your name and email address<br/>
-          3. Your key will be emailed to you within minutes<br/><br/>
-          <strong>API base URL:</strong><br/>
-          <span style={{fontFamily:"'Courier New',monospace",fontSize:10}}>
-            https://mobile.fmcsa.dot.gov/qc/services/carriers/{"{"}dotNumber{"}"}?webKey={"{"}yourKey{"}"}
-          </span>
-        </div>
-        <div style={{marginBottom:16}}>
-          <label className="lbl">Your FMCSA Web Key</label>
-          <input className="inp mono" placeholder="Paste your web key here…" value={apiInp}
-            onChange={e=>setApiInp(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&saveKey()}/>
-        </div>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <button className="btn" onClick={logout}>Log out</button>
-          <button className="btn btn-amber" onClick={saveKey}>Save &amp; Open Dashboard →</button>
-        </div>
-      </div>
-      {toast&&<div className={`toast toast-${toast.type}`}>{toast.text}</div>}
-    </div>
-  );
-
-  // ──────────────────────────────────────────────
-  // DASHBOARD
-  // ──────────────────────────────────────────────
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100vh",background:"var(--bg)"}}>
-
-      {/* HEADER */}
       <div style={{background:"var(--surface)",borderBottom:"0.5px solid var(--border)",padding:"0 1.25rem",display:"flex",alignItems:"center",gap:12,height:48,flexShrink:0}}>
         <div style={{fontFamily:"'Courier New',monospace",fontSize:12,fontWeight:700,color:"var(--amber-d)",letterSpacing:".14em"}}>◈ TRUCKER INTEL</div>
-        <div style={{width:"0.5px",height:16,background:"var(--border)"}}/>
-        <div style={{fontSize:11,color:"var(--text3)"}}>USDOT Carrier Database</div>
         <div style={{flex:1}}/>
         <div style={{fontSize:11,color:"var(--text3)",fontFamily:"'Courier New',monospace"}}>{user}</div>
-        <button className="btn btn-sm" onClick={()=>{setPage("setup");setApiInp(apiKey)}}>Change API Key</button>
         <button className="btn btn-sm" onClick={logout}>Sign out</button>
       </div>
 
       <div style={{display:"flex",flex:1,gap:"0.875rem",padding:"0.875rem",overflow:"hidden"}}>
-
-        {/* ── SIDEBAR ── */}
         <div className="sidebar">
-
-          {/* Stats */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-            {[["Records",truckers.length.toLocaleString()],["Filtered",filtered.length.toLocaleString()],["Trucks",totalTrucks.toLocaleString()],["States",stateCount]].map(([l,v])=>(
-              <div key={l} className="stat">
-                <div className="stat-v">{v}</div>
-                <div className="stat-l">{l}</div>
-              </div>
-            ))}
+            <div className="stat"><div className="stat-v">{truckers.length}</div><div className="stat-l">Records</div></div>
+            <div className="stat"><div className="stat-v">{filtered.length}</div><div className="stat-l">Filtered</div></div>
           </div>
-
-          {/* Lookup / Scan panel */}
           <div className="card" style={{padding:"0.875rem"}}>
             <div style={{display:"flex",borderBottom:"0.5px solid var(--border)",marginBottom:12}}>
               <button className={`tab ${tab==="lookup"?"active":""}`} onClick={()=>setTab("lookup")}>Single DOT</button>
-              <button className={`tab ${tab==="scan"?"active":""}`} onClick={()=>setTab("scan")}>Auto scan</button>
+              <button className={`tab ${tab==="scan"?"active":""}`} onClick={()=>setTab("scan")}>Auto Scan</button>
             </div>
-
-            {tab==="lookup"&&(
+            {tab==="lookup"?(
               <div>
                 <label className="lbl">USDOT Number</label>
-                <div style={{display:"flex",gap:6,marginBottom:8}}>
-                  <input className="inp mono" style={{flex:1}} placeholder="e.g. 3874521" value={dotVal}
-                    onChange={e=>setDotVal(e.target.value)}
-                    onKeyDown={e=>e.key==="Enter"&&lookupOne()}
-                    disabled={looking}/>
-                  <button className="btn btn-amber" onClick={lookupOne} disabled={looking}>
-                    {looking?"…":"Go"}
-                  </button>
+                <div style={{display:"flex",gap:6}}>
+                  <input className="inp mono" placeholder="e.g. 12345" value={dotVal} onChange={e=>setDotVal(e.target.value)} disabled={looking}/>
+                  <button className="btn btn-amber" onClick={lookupOne} disabled={looking}>{looking?"…":"Go"}</button>
                 </div>
-                <p style={{fontSize:10,color:"var(--text3)",lineHeight:1.65}}>
-                  Fetch any carrier's info from FMCSA SAFER instantly. Duplicate DOT numbers are updated, not duplicated.
-                </p>
               </div>
-            )}
-
-            {tab==="scan"&&(
+            ):(
               <div>
-                <p style={{fontSize:10,color:"var(--text3)",lineHeight:1.65,marginBottom:10}}>
-                  Scan a sequential range of USDOT numbers automatically. Carriers with active MC numbers will be added. Max 500 per run.
-                </p>
                 <div style={{display:"flex",gap:6,marginBottom:8}}>
-                  <div style={{flex:1}}>
-                    <label className="lbl">Start DOT</label>
-                    <input className="inp mono" placeholder="e.g. 3870000" value={scan.s}
-                      disabled={scan.on} onChange={e=>setScan(v=>({...v,s:e.target.value}))}/>
-                  </div>
-                  <div style={{flex:1}}>
-                    <label className="lbl">End DOT</label>
-                    <input className="inp mono" placeholder="e.g. 3870500" value={scan.e}
-                      disabled={scan.on} onChange={e=>setScan(v=>({...v,e:e.target.value}))}/>
-                  </div>
+                  <div style={{flex:1}}><label className="lbl">Start</label><input className="inp mono" value={scan.s} onChange={e=>setScan(v=>({...v,s:e.target.value}))} disabled={scan.on}/></div>
+                  <div style={{flex:1}}><label className="lbl">End</label><input className="inp mono" value={scan.e} onChange={e=>setScan(v=>({...v,e:e.target.value}))} disabled={scan.on}/></div>
                 </div>
-                {scan.on&&(
+                {scan.on?(
                   <div style={{marginBottom:10}}>
                     <div className="pb"><div className="pbf" style={{width:`${pct}%`}}/></div>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--text3)",fontFamily:"'Courier New',monospace"}}>
-                      <span>Scanning DOT #{scan.cur}</span>
-                      <span style={{color:"var(--amber-d)",fontWeight:600}}>{scan.found} found · {pct}%</span>
-                    </div>
+                    <div style={{fontSize:10,color:"var(--text3)"}}>Found: {scan.found} · {pct}%</div>
+                    <button className="btn btn-red" style={{width:"100%",marginTop:8}} onClick={stopScan}>Stop</button>
                   </div>
-                )}
-                {!scan.on
-                  ?<button className="btn btn-amber" style={{width:"100%"}} onClick={startScan}>▶ Start scan</button>
-                  :<button className="btn btn-red" style={{width:"100%"}} onClick={stopScan}>■ Stop scan</button>
-                }
+                ):<button className="btn btn-amber" style={{width:"100%"}} onClick={startScan}>Start Scan</button>}
               </div>
             )}
           </div>
-
-          {/* Filter panel */}
           <div className="card" style={{padding:"0.875rem"}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-              <span style={{fontSize:12,fontWeight:600,color:"var(--text)"}}>Filters</span>
-              <button className="btn btn-sm" style={{fontSize:10}} onClick={()=>setFilter({state:"ALL",minT:"",maxT:"",q:""})}>Clear all</button>
-            </div>
-            <div style={{marginBottom:8}}>
-              <label className="lbl">Search</label>
-              <input className="inp" placeholder="Name, DOT #, city, phone…" value={filter.q}
-                onChange={e=>setFilter(f=>({...f,q:e.target.value}))}/>
-            </div>
-            <div style={{marginBottom:8}}>
-              <label className="lbl">State</label>
-              <select className="inp" value={filter.state} onChange={e=>setFilter(f=>({...f,state:e.target.value}))}>
-                <option value="ALL">All states</option>
-                {STATES.map(s=><option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div style={{display:"flex",gap:6}}>
-              <div style={{flex:1}}>
-                <label className="lbl">Min trucks</label>
-                <input className="inp mono" type="number" min="0" placeholder="0" value={filter.minT}
-                  onChange={e=>setFilter(f=>({...f,minT:e.target.value}))}/>
-              </div>
-              <div style={{flex:1}}>
-                <label className="lbl">Max trucks</label>
-                <input className="inp mono" type="number" min="0" placeholder="∞" value={filter.maxT}
-                  onChange={e=>setFilter(f=>({...f,maxT:e.target.value}))}/>
-              </div>
-            </div>
-          </div>
-
-          {/* Info box */}
-          <div className="help-box">
-            <strong>About this app</strong><br/>
-            Data is fetched in real-time from <a href="https://mobile.fmcsa.dot.gov" target="_blank">FMCSA SAFER</a>. Records are saved locally in your browser's storage. Use <strong>Export CSV</strong> to back up your list at any time.
+            <label className="lbl">Search/Filter</label>
+            <input className="inp" placeholder="Search records..." value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))}/>
           </div>
         </div>
 
-        {/* ── MAIN TABLE ── */}
-        <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column"}}>
-          <div className="card" style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",padding:0}}>
-
-            {/* Table toolbar */}
-            <div style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:8,borderBottom:"0.5px solid var(--border)",flexShrink:0}}>
-              <span style={{fontSize:12,fontWeight:600,color:"var(--text)",flex:1}}>
-                {filtered.length.toLocaleString()} carrier{filtered.length!==1?"s":""}
-                {truckers.length!==filtered.length&&
-                  <span style={{color:"var(--text3)",fontWeight:400}}> (of {truckers.length.toLocaleString()} total)</span>}
-              </span>
-              <button className="btn btn-sm" onClick={exportCSV} disabled={filtered.length===0}>
-                ↓ Export CSV
-              </button>
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div className="card" style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"0.5px solid var(--border)"}}>
+              <span style={{fontSize:12,fontWeight:600}}>{filtered.length} Carriers</span>
+              <button className="btn btn-sm" onClick={exportCSV}>Export CSV</button>
             </div>
-
-            {/* Table */}
             <div style={{flex:1,overflow:"auto"}}>
-              {filtered.length===0?(
-                <div style={{textAlign:"center",padding:"3.5rem 1rem",color:"var(--text3)",fontSize:12,lineHeight:2}}>
-                  {truckers.length===0
-                    ?<>No carriers in database.<br/>Enter a USDOT number above or run a range scan to get started.</>
-                    :"No carriers match the current filters."}
-                </div>
-              ):(
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      {[["dot","DOT #"],["name","Company"],["phone","Phone"],["city","City"],["state","ST"],["trucks","Trucks"],["drivers","Drivers"],["ts","Added"]].map(([f,label])=>(
-                        <th key={f} onClick={()=>sortBy(f)} title={`Sort by ${label}`}>
-                          {label} {sf===f?(sd===1?"↑":"↓"):<span style={{opacity:.3}}>⇅</span>}
-                        </th>
-                      ))}
-                      <th style={{cursor:"default"}}></th>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th onClick={()=>sortBy("dot")}>DOT #</th>
+                    <th onClick={()=>sortBy("name")}>Company</th>
+                    <th onClick={()=>sortBy("phone")}>Phone</th>
+                    <th onClick={()=>sortBy("city")}>City</th>
+                    <th onClick={()=>sortBy("state")}>ST</th>
+                    <th onClick={()=>sortBy("trucks")}>Trucks</th>
+                    <th onClick={()=>sortBy("drivers")}>Drivers</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(t=>(
+                    <tr key={t.dot}>
+                      <td><span className="dot-id">#{t.dot}</span></td>
+                      <td style={{fontWeight:600}}>{t.name}</td>
+                      <td style={{fontFamily:"'Courier New',monospace"}}>{t.phone || "—"}</td>
+                      <td>{t.city}</td>
+                      <td><span className="tag tag-amber">{t.state}</span></td>
+                      <td><span className="tag tag-green">{t.trucks}</span></td>
+                      <td>{t.drivers}</td>
+                      <td><button className="btn btn-sm" style={{opacity:0.3}} onClick={()=>delCarrier(t.dot)}>✕</button></td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map(t=>(
-                      <tr key={t.dot}>
-                        <td><span className="dot-id">#{t.dot}</span></td>
-                        <td style={{maxWidth:200}}>
-                          <div style={{fontWeight:600,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</div>
-                          {t.dba&&t.dba!==t.name&&
-                            <div style={{fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>DBA: {t.dba}</div>}
-                        </td>
-                        <td style={{fontFamily:"'Courier New',monospace",whiteSpace:"nowrap"}}>{t.phone||<span style={{color:"var(--text3)"}}>—</span>}</td>
-                        <td>{t.city||<span style={{color:"var(--text3)"}}>—</span>}</td>
-                        <td>
-                          {t.state
-                            ?<span className="tag tag-amber">{t.state}</span>
-                            :<span style={{color:"var(--text3)"}}>—</span>}
-                        </td>
-                        <td>
-                          <span className={`tag ${t.trucks>0?"tag-green":"tag-gray"}`}>
-                            {t.trucks.toLocaleString()}
-                          </span>
-                        </td>
-                        <td style={{fontFamily:"'Courier New',monospace"}}>{t.drivers.toLocaleString()}</td>
-                        <td style={{fontSize:11,color:"var(--text3)",whiteSpace:"nowrap"}}>{new Date(t.ts).toLocaleDateString()}</td>
-                        <td>
-                          {del===t.dot?(
-                            <div style={{display:"flex",gap:4,whiteSpace:"nowrap"}}>
-                              <button className="btn btn-sm btn-red" onClick={()=>delCarrier(t.dot)}>Delete</button>
-                              <button className="btn btn-sm" onClick={()=>setDel(null)}>Cancel</button>
-                            </div>
-                          ):(
-                            <button className="btn btn-sm" style={{opacity:.35,fontSize:13,padding:"2px 8px"}} onClick={()=>setDel(t.dot)} title="Remove carrier">✕</button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       </div>
-
       {toast&&<div className={`toast toast-${toast.type}`}>{toast.text}</div>}
     </div>
   );
