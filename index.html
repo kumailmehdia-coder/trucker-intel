@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Trucker Intel — USDOT Carrier Database</title>
+<title>Trucker Intel — USDOT Pro Database</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -17,7 +17,6 @@
     --amber:#EF9F27;--amber-d:#BA7517;--amber-l:#FAEEDA;--amber-text:#412402;
     --green-bg:#EAF3DE;--green-text:#3B6D11;
     --red-bg:#FCEBEB;--red-border:rgba(200,50,50,0.3);--red-text:#A32D2D;
-    --success-bg:#EAF3DE;--success-border:rgba(60,140,60,0.3);--success-text:#3B6D11;
     --r:8px;--r-lg:12px;
   }
   @media(prefers-color-scheme:dark){
@@ -27,43 +26,35 @@
       --amber:#EF9F27;--amber-d:#FAC775;--amber-l:#412402;--amber-text:#FAEEDA;
       --green-bg:#173404;--green-text:#C0DD97;
       --red-bg:#501313;--red-border:rgba(240,150,150,0.3);--red-text:#F09595;
-      --success-bg:#173404;--success-border:rgba(100,200,100,0.3);--success-text:#C0DD97;
     }
   }
-  input,select,button,textarea{font-family:inherit;font-size:13px}
-  .inp{width:100%;padding:7px 11px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);outline:none;transition:border-color .15s}
+  input,select,button{font-family:inherit;font-size:13px}
+  .inp{width:100%;padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);outline:none;transition:border-color .15s}
   .inp:focus{border-color:var(--amber)}
-  .inp.mono{font-family:'Courier New',monospace}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 16px;font-size:12px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--r);cursor:pointer;background:var(--surface);color:var(--text);transition:all .12s;white-space:nowrap;user-select:none}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:7px 16px;font-size:12px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--r);cursor:pointer;background:var(--surface);color:var(--text);transition:all .12s;user-select:none}
   .btn:hover{background:var(--surface2)}
-  .btn:active{transform:scale(.98)}
   .btn-amber{background:var(--amber);border-color:var(--amber-d);color:var(--amber-text)}
   .btn-amber:hover:not(:disabled){background:var(--amber-d);color:var(--amber-l)}
   .btn-red{background:var(--red-bg);border-color:var(--red-border);color:var(--red-text)}
-  .btn-sm{padding:4px 10px;font-size:11px}
   .card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r-lg)}
   .lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:5px;display:block}
   .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
   .tag-amber{background:var(--amber-l);color:#633806}
   .tag-green{background:var(--green-bg);color:var(--green-text)}
-  .toast{position:fixed;bottom:20px;right:20px;z-index:9999;padding:9px 16px;border-radius:var(--r);font-size:12px;font-weight:500;border:0.5px solid;animation:ti .2s ease;max-width:320px;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
+  .toast{position:fixed;bottom:20px;right:20px;z-index:9999;padding:9px 16px;border-radius:var(--r);font-size:12px;border:0.5px solid;animation:ti .2s ease;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
   @keyframes ti{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-  .toast-ok{background:var(--success-bg);border-color:var(--success-border);color:var(--success-text)}
+  .toast-ok{background:var(--green-bg);border-color:rgba(0,0,0,0.1);color:var(--green-text)}
   .toast-err{background:var(--red-bg);border-color:var(--red-border);color:var(--red-text)}
-  .toast-info{background:var(--amber-l);border-color:#FAC775;color:#633806}
   .pb{height:3px;background:var(--surface2);border-radius:2px;overflow:hidden;margin:6px 0}
   .pbf{height:100%;background:var(--amber);transition:width .3s}
   .tbl{width:100%;border-collapse:collapse}
-  .tbl th{padding:7px 12px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);border-bottom:0.5px solid var(--border);position:sticky;top:0;background:var(--surface);cursor:pointer}
-  .tbl td{padding:8px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle;color:var(--text);font-size:12px}
+  .tbl th{padding:10px 12px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;color:var(--text3);border-bottom:0.5px solid var(--border);position:sticky;top:0;background:var(--surface)}
+  .tbl td{padding:10px 12px;border-bottom:0.5px solid var(--border);color:var(--text);font-size:12px}
   .tbl tr:hover td{background:var(--surface2)}
-  .tab{padding:6px 14px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent}
+  .tab{padding:8px 14px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent}
   .tab.active{color:var(--amber-d);border-bottom-color:var(--amber)}
-  .stat{background:var(--surface2);border-radius:var(--r);padding:10px 14px}
-  .stat-v{font-size:20px;font-weight:600;font-family:'Courier New',monospace}
-  .stat-l{font-size:10px;font-weight:600;text-transform:uppercase;color:var(--text3)}
-  .phone-none{color:var(--text3);font-style:italic;font-size:11px}
-  .sidebar{width:265px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+  .phone-highlight{color:var(--amber-d);font-weight:600;font-family:'Courier New',monospace}
+  .sidebar{width:270px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
 </style>
 </head>
 <body>
@@ -73,89 +64,69 @@ const {useState,useEffect,useRef}=React;
 
 const API_KEY = "2391d610f4ab3253f9d3b724cbb29bb7ae1deb85";
 
-function hashPw(s){
-  let h=5381;
-  for(let i=0;i<s.length;i++) h=Math.imul(h,33)^s.charCodeAt(i);
-  return(h>>>0).toString(16);
-}
-
-const DB={
-  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch{return false}},
-  get(k){try{const r=localStorage.getItem(k);return r?JSON.parse(r):null}catch{return null}},
-  del(k){try{localStorage.removeItem(k)}catch{}}
-};
-
-function formatPhone(raw){
+// Logic to clean and format phone numbers properly
+function cleanPhone(raw){
   if(!raw) return "";
   const d = String(raw).replace(/\D/g,"");
-  // Filter out obvious fake numbers or dashes
-  if(!d || d.length < 7 || d === "0000000000" || d === "1111111111") return "";
+  if(!d || d.length < 10) return "";
+  if(d === "0000000000" || d === "1234567890") return "";
   
-  if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
-  if(d.length===11&&d[0]==="1")return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
-  return raw;
+  const main = d.length === 11 && d[0] === "1" ? d.slice(1) : d;
+  return `(${main.slice(0,3)}) ${main.slice(3,6)}-${main.slice(6,10)}`;
+}
+
+// THE DEEP HUNT: This scans the ENTIRE JSON object for hidden numbers
+function deepHuntPhone(obj){
+  // 1. Check standard fields
+  let found = obj.phoneNumber || obj.telephone || obj.phone || obj.cellPhone || "";
+  if(cleanPhone(found)) return cleanPhone(found);
+
+  // 2. Check Nested Contact Object
+  if(obj.carrierContact){
+    found = obj.carrierContact.phoneNumber || obj.carrierContact.telephone || "";
+    if(cleanPhone(found)) return cleanPhone(found);
+  }
+
+  // 3. REGEX SCRAPE (The "Pro" Fix)
+  // Convert everything to a string and look for phone patterns anywhere in the response
+  const blob = JSON.stringify(obj);
+  const phoneRegex = /\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})/g;
+  const matches = blob.match(phoneRegex);
+  
+  if(matches && matches.length > 0){
+    // Return the first match that isn't a dummy number
+    for(let m of matches){
+       if(cleanPhone(m)) return cleanPhone(m);
+    }
+  }
+  return null;
 }
 
 function App(){
-  const [page,setPage]=useState("loading");
   const [user,setUser]=useState(null);
   const [truckers,setTruckers]=useState([]);
-  const [filter,setFilter]=useState({state:"ALL",minT:"",maxT:"",q:""});
-  const [auth,setAuth]=useState({mode:"login",u:"",p:"",p2:"",err:""});
+  const [filter,setFilter]=useState({q:""});
   const [dotVal,setDotVal]=useState("");
   const [scan,setScan]=useState({on:false,s:"",e:"",cur:0,tot:0,found:0});
   const [toast,setToast]=useState(null);
   const [tab,setTab]=useState("lookup");
-  const [sf,setSf]=useState("ts");
-  const [sd,setSd]=useState(-1);
-  const [looking,setLooking]=useState(false);
+  const [loading,setLoading]=useState(false);
   const scanRef=useRef(false);
-  const tRef=useRef(null);
   const trRef=useRef([]);
 
   const msg=(text,type="ok")=>{
     setToast({text,type});
-    if(tRef.current)clearTimeout(tRef.current);
-    tRef.current=setTimeout(()=>setToast(null),4000);
+    setTimeout(()=>setToast(null),4000);
   };
 
   useEffect(()=>{
-    const sess=DB.get("_sess");
-    if(sess&&sess.u){
-      const ud=DB.get(`u:${sess.u}`);
-      if(ud){
-        const trs=DB.get(`t:${sess.u}`)||[];
-        trRef.current=trs;
-        setUser(sess.u); setTruckers(trs); setPage("dash");
-        return;
-      }
+    const sess=JSON.parse(localStorage.getItem("_sess"));
+    if(sess){
+      setUser(sess.u);
+      const trs=JSON.parse(localStorage.getItem(`t:${sess.u}`))||[];
+      trRef.current=trs; setTruckers(trs);
     }
-    setPage("auth");
   },[]);
-
-  const authSubmit=()=>{
-    const{mode,u,p,p2}=auth;
-    const un=u.trim().toLowerCase();
-    if(!un||!p) return setAuth(a=>({...a,err:"Username and password required"}));
-    const key=`u:${un}`;
-    if(mode==="reg"){
-      if(p.length<6) return setAuth(a=>({...a,err:"Password min 6 chars"}));
-      if(p!==p2) return setAuth(a=>({...a,err:"Passwords don't match"}));
-      if(DB.get(key)) return setAuth(a=>({...a,err:"Username taken"}));
-      DB.set(key,{pw:hashPw(p),created:Date.now()});
-      DB.set("_sess",{u:un});
-      setUser(un); trRef.current=[]; setTruckers([]); setPage("dash");
-    }else{
-      const ud=DB.get(key);
-      if(!ud||ud.pw!==hashPw(p)) return setAuth(a=>({...a,err:"Incorrect login"}));
-      DB.set("_sess",{u:un});
-      const trs=DB.get(`t:${un}`)||[];
-      trRef.current=trs;
-      setUser(un); setTruckers(trs); setPage("dash");
-    }
-  };
-
-  const logout=()=>{ DB.del("_sess"); setUser(null); setPage("auth"); };
 
   const fetchDOT=async(dotNum)=>{
     try{
@@ -165,174 +136,137 @@ function App(){
       const c=data?.content?.carrier;
       if(!c||!c.dotNumber) return null;
 
-      // --- LOG DATA FOR DEBUGGING ---
-      console.log(`DOT #${dotNum} Raw Response:`, c);
+      // STRICT STATUS CHECK: Only Active Carriers
+      const isActive = (c.statusCode === "A" || c.statusCode === "ACTIVE") && c.allowedToOperate !== "N";
+      if(!isActive) return { error: "inactive", name: c.legalName };
 
-      // --- STRICT ACTIVITY FILTER ---
-      const status = (c.statusCode || "").toUpperCase();
-      const canOperate = (c.allowedToOperate || "").toUpperCase();
-      
-      // A = Active. Anything else (I, O, C, N) is usually inactive.
-      if(status !== "A" || canOperate === "N") {
-        return { error: "inactive", name: c.legalName || "Unknown" };
-      }
-
-      // --- DEEP PHONE SEARCH ---
-      // 1. Check top level fields
-      let raw = c.phoneNumber || c.telephone || c.phone || c.phoneNum || "";
-      
-      // 2. Check nested contact object if top level is empty
-      if(!raw && c.carrierContact) {
-        raw = c.carrierContact.phoneNumber || c.carrierContact.telephone || "";
-      }
-
-      const formatted = formatPhone(raw);
+      // DEEP HUNT FOR PHONE
+      const phone = deepHuntPhone(c);
 
       return{
         dot:String(c.dotNumber),
         name:(c.legalName||c.dbaName||"Unknown").trim(),
-        phone: formatted || "Phone Missing",
+        phone: phone || "No Phone Found",
         city:(c.phyCity||"").trim(),
         state:(c.phyState||"").trim().toUpperCase(),
         trucks:parseInt(c.totalTrucks)||0,
-        drivers:parseInt(c.totalDrivers)||0,
         ts:Date.now()
       };
     }catch(e){ return null; }
   };
 
-  const addCarrier=(carrier)=>{
-    const prev=trRef.current;
-    const next=prev.find(t=>t.dot===carrier.dot)?prev.map(t=>t.dot===carrier.dot?{...t,...carrier}:t):[carrier,...prev];
-    trRef.current=next; setTruckers([...next]);
-    DB.set(`t:${user}`,next);
+  const addCarrier=(c)=>{
+    const next=[c,...trRef.current.filter(t=>t.dot!==c.dot)];
+    trRef.current=next; setTruckers(next);
+    localStorage.setItem(`t:${user}`,JSON.stringify(next));
   };
 
   const lookupOne=async()=>{
-    const d=dotVal.trim();
-    if(!d||isNaN(d)) return msg("Invalid DOT","err");
-    setLooking(true); msg(`Searching #${d}...`,"info");
-    const c=await fetchDOT(d);
-    setLooking(false);
-    if(!c) return msg(`DOT #${d} not found.`,"err");
-    if(c.error) return msg(`DOT #${d} is INACTIVE. Skipped.`,"err");
-    addCarrier(c); msg(`Added: ${c.name}`); setDotVal("");
+    if(!dotVal) return;
+    setLoading(true);
+    const c=await fetchDOT(dotVal);
+    setLoading(false);
+    if(!c) return msg("DOT not found","err");
+    if(c.error) return msg(`${c.name} is INACTIVE. Skipped.`,"err");
+    addCarrier(c); msg(`Added ${c.name}`); setDotVal("");
   };
 
   const startScan=async()=>{
     const s=parseInt(scan.s), e=parseInt(scan.e);
-    if(isNaN(s)||isNaN(e)||s>e) return msg("Invalid range","err");
+    if(isNaN(s)||isNaN(e)) return msg("Invalid Range","err");
     scanRef.current=true;
     setScan(v=>({...v,on:true,cur:s,tot:e-s+1,found:0}));
-    let found=0;
+    let fCount=0;
     for(let d=s;d<=e;d++){
       if(!scanRef.current) break;
       setScan(v=>({...v,cur:d}));
       const c=await fetchDOT(d);
-      if(c && !c.error){ found++; addCarrier(c); setScan(v=>({...v,found})); }
-      await new Promise(r=>setTimeout(r,400)); // Slightly slower to avoid rate limits
+      if(c && !c.error){ fCount++; addCarrier(c); setScan(v=>({...v,found:fCount})); }
+      await new Promise(r=>setTimeout(r,350));
     }
-    scanRef.current=false; setScan(v=>({...v,on:false}));
-    msg(`Finished: ${found} Active found`);
+    setScan(v=>({...v,on:false}));
+    msg(`Scan Complete: ${fCount} active found`);
   };
 
-  const filtered=truckers.filter(t=>{
-    if(filter.state!=="ALL"&&t.state!==filter.state) return false;
-    if(filter.q){
-      const q=filter.q.toLowerCase();
-      return t.name.toLowerCase().includes(q)||t.dot.includes(q)||t.phone.includes(q);
-    }
-    return true;
-  }).sort((a,b)=>{
-    let av=a[sf],bv=b[sf];
-    if(typeof av === 'number') return (av-bv)*sd;
-    return String(av).localeCompare(String(bv))*sd;
-  });
+  const filtered=truckers.filter(t=>
+    t.name.toLowerCase().includes(filter.q.toLowerCase()) || t.dot.includes(filter.q)
+  );
 
-  const delCarrier=(dot)=>{
-    const next=trRef.current.filter(t=>t.dot!==dot);
-    trRef.current=next; setTruckers([...next]); DB.set(`t:${user}`,next);
-  };
-
-  const sortBy=f=>{if(sf===f)setSd(d=>-d);else{setSf(f);setSd(1)}};
-  const pct=scan.on?Math.round(((scan.cur-scan.s)/(scan.tot||1))*100):0;
-
-  if(page==="loading") return <div style={{padding:20}}>Loading...</div>;
-
-  if(page==="auth") return(
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"var(--bg)"}}>
-      <div className="card" style={{width:320,padding:25}}>
-        <h2 style={{marginBottom:15}}>{auth.mode==="login"?"Login":"Register"}</h2>
-        <input className="inp" style={{marginBottom:10}} placeholder="Username" value={auth.u} onChange={e=>setAuth(a=>({...a,u:e.target.value}))}/>
-        <input className="inp" style={{marginBottom:10}} type="password" placeholder="Password" value={auth.p} onChange={e=>setAuth(a=>({...a,p:e.target.value}))}/>
-        {auth.mode==="reg" && <input className="inp" style={{marginBottom:10}} type="password" placeholder="Confirm" value={auth.p2} onChange={e=>setAuth(a=>({...a,p2:e.target.value}))}/>}
-        {auth.err && <div style={{color:"red",fontSize:11,marginBottom:10}}>{auth.err}</div>}
-        <button className="btn btn-amber" style={{width:"100%"}} onClick={authSubmit}>Continue</button>
-        <button className="btn btn-sm" style={{width:"100%",marginTop:10,border:"none"}} onClick={()=>setAuth(v=>({...v,mode:v.mode==="login"?"reg":"login",err:""}))}>
-          {auth.mode==="login"?"Create account":"Back to login"}
-        </button>
-      </div>
+  if(!user) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh"}}>
+       <button className="btn btn-amber" onClick={()=>{
+         localStorage.setItem("_sess",JSON.stringify({u:"Mustajab"}));
+         window.location.reload();
+       }}>Enter Database</button>
     </div>
   );
 
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100vh"}}>
-      <div style={{background:"var(--surface)",padding:"10px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <b style={{color:"var(--amber-d)"}}>◈ TRUCKER INTEL</b>
-        <button className="btn btn-sm" onClick={logout}>Logout ({user})</button>
+      <div style={{background:"var(--surface)",padding:"10px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <b style={{color:"var(--amber-d)",letterSpacing:"1px"}}>◈ TRUCKER INTEL PRO</b>
+        <span style={{fontSize:11,color:"var(--text3)"}}>Operator: {user}</span>
       </div>
+
       <div style={{display:"flex",flex:1,padding:15,gap:15,overflow:"hidden"}}>
         <div className="sidebar">
-          <div className="stat"><div className="stat-v">{truckers.length}</div><div className="stat-l">Total Active</div></div>
           <div className="card" style={{padding:15}}>
-            <div style={{display:"flex",marginBottom:10}}>
+            <div style={{display:"flex",marginBottom:12,borderBottom:"1px solid var(--border)"}}>
               <button className={`tab ${tab==="lookup"?"active":""}`} onClick={()=>setTab("lookup")}>Single</button>
-              <button className={`tab ${tab==="scan"?"active":""}`} onClick={()=>setTab("scan")}>Scan</button>
+              <button className={`tab ${tab==="scan"?"active":""}`} onClick={()=>setTab("scan")}>Auto Scan</button>
             </div>
             {tab==="lookup"?(
               <div style={{display:"flex",gap:5}}>
-                <input className="inp mono" placeholder="DOT #" value={dotVal} onChange={e=>setDotVal(e.target.value)}/>
-                <button className="btn btn-amber" onClick={lookupOne} disabled={looking}>{looking?"...":"Go"}</button>
+                <input className="inp" placeholder="DOT #" value={dotVal} onChange={e=>setDotVal(e.target.value)}/>
+                <button className="btn btn-amber" onClick={lookupOne} disabled={loading}>{loading?"...":"Go"}</button>
               </div>
             ):(
               <div>
                 <div style={{display:"flex",gap:5,marginBottom:10}}>
-                  <input className="inp mono" placeholder="Start" value={scan.s} onChange={e=>setScan(v=>({...v,s:e.target.value}))}/>
-                  <input className="inp mono" placeholder="End" value={scan.e} onChange={e=>setScan(v=>({...v,e:e.target.value}))}/>
+                  <input className="inp" placeholder="Start" value={scan.s} onChange={e=>setScan(v=>({...v,s:e.target.value}))}/>
+                  <input className="inp" placeholder="End" value={scan.e} onChange={e=>setScan(v=>({...v,e:e.target.value}))}/>
                 </div>
                 {scan.on?(
                   <div>
-                    <div className="pb"><div className="pbf" style={{width:`${pct}%`}}/></div>
-                    <button className="btn btn-red" style={{width:"100%"}} onClick={()=>scanRef.current=false}>Stop</button>
+                    <div className="pb"><div className="pbf" style={{width:`${Math.round(((scan.cur-scan.s)/scan.tot)*100)}%`}}/></div>
+                    <button className="btn btn-red" style={{width:"100%",marginTop:5}} onClick={()=>scanRef.current=false}>Stop</button>
                   </div>
-                ):<button className="btn btn-amber" style={{width:"100%"}} onClick={startScan}>Start Scan</button>}
+                ):<button className="btn btn-amber" style={{width:"100%"}} onClick={startScan}>Start Pro Scan</button>}
               </div>
             )}
           </div>
-          <input className="inp" placeholder="Search saved..." value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))}/>
+          <div className="card" style={{padding:15}}>
+             <label className="lbl">Filter Records</label>
+             <input className="inp" placeholder="Search saved..." value={filter.q} onChange={e=>setFilter({q:e.target.value})}/>
+          </div>
         </div>
-        <div className="card" style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+
+        <div className="card" style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{flex:1,overflow:"auto"}}>
             <table className="tbl">
               <thead>
                 <tr>
-                  <th onClick={()=>sortBy("dot")}>DOT</th>
-                  <th onClick={()=>sortBy("name")}>Company</th>
-                  <th onClick={()=>sortBy("phone")}>Phone Number</th>
-                  <th onClick={()=>sortBy("state")}>ST</th>
-                  <th onClick={()=>sortBy("trucks")}>Trucks</th>
+                  <th>USDOT</th>
+                  <th>Company Name</th>
+                  <th>Direct Phone</th>
+                  <th>Location</th>
+                  <th>Trucks</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(t=>(
                   <tr key={t.dot}>
-                    <td className="mono" style={{color:"var(--amber-d)"}}>#{t.dot}</td>
+                    <td style={{fontFamily:"monospace",color:"var(--amber-d)"}}>#{t.dot}</td>
                     <td><b>{t.name}</b></td>
-                    <td className="mono">{t.phone === "Phone Missing" ? <span className="phone-none">Missing</span> : t.phone}</td>
-                    <td><span className="tag tag-amber">{t.state}</span></td>
+                    <td className="phone-highlight">{t.phone === "No Phone Found" ? <span style={{color:"#888",fontWeight:400}}>N/A</span> : t.phone}</td>
+                    <td>{t.city}, {t.state}</td>
                     <td><span className="tag tag-green">{t.trucks}</span></td>
-                    <td><button className="btn btn-sm" onClick={()=>delCarrier(t.dot)}>✕</button></td>
+                    <td><button className="btn btn-red" style={{padding:"2px 8px"}} onClick={()=>{
+                      const n = trRef.current.filter(x=>x.dot!==t.dot);
+                      trRef.current=n; setTruckers(n);
+                      localStorage.setItem(`t:${user}`,JSON.stringify(n));
+                    }}>✕</button></td>
                   </tr>
                 ))}
               </tbody>
