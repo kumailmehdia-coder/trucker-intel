@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Trucker Intel — USDOT Pro Database</title>
+<title>Trucker Intel — Ultimate Edition</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -28,7 +28,7 @@
       --red-bg:#501313;--red-border:rgba(240,150,150,0.3);--red-text:#F09595;
     }
   }
-  input,select,button{font-family:inherit;font-size:13px}
+  input,button{font-family:inherit;font-size:13px}
   .inp{width:100%;padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);outline:none;transition:border-color .15s}
   .inp:focus{border-color:var(--amber)}
   .btn{display:inline-flex;align-items:center;justify-content:center;padding:7px 16px;font-size:12px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--r);cursor:pointer;background:var(--surface);color:var(--text);transition:all .12s;user-select:none}
@@ -53,7 +53,7 @@
   .tbl tr:hover td{background:var(--surface2)}
   .tab{padding:8px 14px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent}
   .tab.active{color:var(--amber-d);border-bottom-color:var(--amber)}
-  .phone-highlight{color:var(--amber-d);font-weight:600;font-family:'Courier New',monospace}
+  .phone-found{color:var(--amber-d);font-weight:600;font-family:monospace}
   .sidebar{width:270px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
 </style>
 </head>
@@ -64,55 +64,55 @@ const {useState,useEffect,useRef}=React;
 
 const API_KEY = "2391d610f4ab3253f9d3b724cbb29bb7ae1deb85";
 
-// Logic to clean and format phone numbers properly
-function cleanPhone(raw){
-  if(!raw) return "";
-  const d = String(raw).replace(/\D/g,"");
-  if(!d || d.length < 10) return "";
-  if(d === "0000000000" || d === "1234567890") return "";
-  
-  const main = d.length === 11 && d[0] === "1" ? d.slice(1) : d;
-  return `(${main.slice(0,3)}) ${main.slice(3,6)}-${main.slice(6,10)}`;
+// Cleaner function
+function formatPhone(s){
+  if(!s) return "";
+  const d = s.replace(/\D/g,"");
+  if(d.length < 10 || d.startsWith("000")) return "";
+  const m = d.length === 11 && d[0] === "1" ? d.slice(1) : d;
+  return `(${m.slice(0,3)}) ${m.slice(3,6)}-${m.slice(6,10)}`;
 }
 
-// THE DEEP HUNT: This scans the ENTIRE JSON object for hidden numbers
-function deepHuntPhone(obj){
-  // 1. Check standard fields
-  let found = obj.phoneNumber || obj.telephone || obj.phone || obj.cellPhone || "";
-  if(cleanPhone(found)) return cleanPhone(found);
+// HYBRID SCRAPER: Hits the API, and if empty, scrapes SAFER directly
+async function getProPhone(dot, apiData){
+  // 1. Try API fields first
+  let raw = apiData.phoneNumber || apiData.telephone || "";
+  if(formatPhone(raw)) return formatPhone(raw);
 
-  // 2. Check Nested Contact Object
-  if(obj.carrierContact){
-    found = obj.carrierContact.phoneNumber || obj.carrierContact.telephone || "";
-    if(cleanPhone(found)) return cleanPhone(found);
+  // 2. Try Regex on API blob
+  const blob = JSON.stringify(apiData);
+  const matches = blob.match(/\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})/g);
+  if(matches) {
+    for(let m of matches) if(formatPhone(m)) return formatPhone(m);
   }
 
-  // 3. REGEX SCRAPE (The "Pro" Fix)
-  // Convert everything to a string and look for phone patterns anywhere in the response
-  const blob = JSON.stringify(obj);
-  const phoneRegex = /\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})/g;
-  const matches = blob.match(phoneRegex);
-  
-  if(matches && matches.length > 0){
-    // Return the first match that isn't a dummy number
-    for(let m of matches){
-       if(cleanPhone(m)) return cleanPhone(m);
-    }
-  }
-  return null;
+  // 3. NUCLEAR OPTION: Scrape SAFER directly via Proxy
+  try {
+    const saferUrl = `https://safer.fmcsa.dot.gov/query.asp?searchtype=ANY&query_type=queryCarrierSnapshot&query_param=USDOT&query_string=${dot}`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(saferUrl)}`;
+    
+    const res = await fetch(proxyUrl);
+    const json = await res.json();
+    const html = json.contents;
+
+    // Look for "Phone: </b>" in the HTML source
+    const match = html.match(/Phone:.*?<\/b>.*?([0-9\(\)\-\s]{10,20})/i);
+    if(match && match[1]) return formatPhone(match[1]);
+  } catch(e) { console.error("Scraper failed", e); }
+
+  return "Missing";
 }
 
 function App(){
-  const [user,setUser]=useState(null);
+  const [user,setUser]=useState("Mustajab");
   const [truckers,setTruckers]=useState([]);
   const [filter,setFilter]=useState({q:""});
   const [dotVal,setDotVal]=useState("");
-  const [scan,setScan]=useState({on:false,s:"",e:"",cur:0,tot:0,found:0});
+  const [scan,setScan]=useState({on:false,s:"",e:"",cur:0,tot:0});
   const [toast,setToast]=useState(null);
   const [tab,setTab]=useState("lookup");
   const [loading,setLoading]=useState(false);
   const scanRef=useRef(false);
-  const trRef=useRef([]);
 
   const msg=(text,type="ok")=>{
     setToast({text,type});
@@ -120,158 +120,127 @@ function App(){
   };
 
   useEffect(()=>{
-    const sess=JSON.parse(localStorage.getItem("_sess"));
-    if(sess){
-      setUser(sess.u);
-      const trs=JSON.parse(localStorage.getItem(`t:${sess.u}`))||[];
-      trRef.current=trs; setTruckers(trs);
-    }
+    const saved = JSON.parse(localStorage.getItem(`t:${user}`)) || [];
+    setTruckers(saved);
   },[]);
 
-  const fetchDOT=async(dotNum)=>{
-    try{
-      const res=await fetch(`https://mobile.fmcsa.dot.gov/qc/services/carriers/${dotNum}?webKey=${API_KEY}`);
-      if(!res.ok) return null;
-      const data=await res.json();
-      const c=data?.content?.carrier;
-      if(!c||!c.dotNumber) return null;
+  const fetchFullData = async(dotNum) => {
+    try {
+      const res = await fetch(`https://mobile.fmcsa.dot.gov/qc/services/carriers/${dotNum}?webKey=${API_KEY}`);
+      const data = await res.json();
+      const c = data?.content?.carrier;
+      if(!c || !c.dotNumber) return null;
 
-      // STRICT STATUS CHECK: Only Active Carriers
-      const isActive = (c.statusCode === "A" || c.statusCode === "ACTIVE") && c.allowedToOperate !== "N";
-      if(!isActive) return { error: "inactive", name: c.legalName };
+      // Extract phone using the Hybrid Scraper
+      const phone = await getProPhone(dotNum, c);
 
-      // DEEP HUNT FOR PHONE
-      const phone = deepHuntPhone(c);
-
-      return{
-        dot:String(c.dotNumber),
-        name:(c.legalName||c.dbaName||"Unknown").trim(),
-        phone: phone || "No Phone Found",
-        city:(c.phyCity||"").trim(),
-        state:(c.phyState||"").trim().toUpperCase(),
-        trucks:parseInt(c.totalTrucks)||0,
-        ts:Date.now()
+      return {
+        dot: String(c.dotNumber),
+        name: (c.legalName || "Unknown").trim(),
+        phone: phone,
+        location: `${c.phyCity || ""}, ${c.phyState || ""}`,
+        trucks: c.totalTrucks || 0,
+        status: c.statusCode || "I"
       };
-    }catch(e){ return null; }
+    } catch(e) { return null; }
   };
 
-  const addCarrier=(c)=>{
-    const next=[c,...trRef.current.filter(t=>t.dot!==c.dot)];
-    trRef.current=next; setTruckers(next);
-    localStorage.setItem(`t:${user}`,JSON.stringify(next));
+  const saveCarrier = (c) => {
+    setTruckers(prev => {
+      const next = [c, ...prev.filter(x => x.dot !== c.dot)];
+      localStorage.setItem(`t:${user}`, JSON.stringify(next));
+      return next;
+    });
   };
 
-  const lookupOne=async()=>{
+  const runLookup = async() => {
     if(!dotVal) return;
     setLoading(true);
-    const c=await fetchDOT(dotVal);
+    const res = await fetchFullData(dotVal);
     setLoading(false);
-    if(!c) return msg("DOT not found","err");
-    if(c.error) return msg(`${c.name} is INACTIVE. Skipped.`,"err");
-    addCarrier(c); msg(`Added ${c.name}`); setDotVal("");
+    if(res) {
+        saveCarrier(res);
+        msg(res.phone === "Missing" ? "Found Carrier (No Phone)" : `Found: ${res.phone}`);
+        setDotVal("");
+    } else msg("Not found", "err");
   };
 
-  const startScan=async()=>{
+  const startAutoScan = async() => {
     const s=parseInt(scan.s), e=parseInt(scan.e);
-    if(isNaN(s)||isNaN(e)) return msg("Invalid Range","err");
-    scanRef.current=true;
-    setScan(v=>({...v,on:true,cur:s,tot:e-s+1,found:0}));
-    let fCount=0;
-    for(let d=s;d<=e;d++){
+    if(isNaN(s) || isNaN(e)) return msg("Invalid Range", "err");
+    scanRef.current = true;
+    setScan(v => ({...v, on:true, tot: e-s+1}));
+    
+    for(let i=s; i<=e; i++){
       if(!scanRef.current) break;
-      setScan(v=>({...v,cur:d}));
-      const c=await fetchDOT(d);
-      if(c && !c.error){ fCount++; addCarrier(c); setScan(v=>({...v,found:fCount})); }
-      await new Promise(r=>setTimeout(r,350));
+      setScan(v => ({...v, cur: i}));
+      const res = await fetchFullData(i);
+      if(res && res.status === 'A') saveCarrier(res);
+      await new Promise(r => setTimeout(r, 400));
     }
-    setScan(v=>({...v,on:false}));
-    msg(`Scan Complete: ${fCount} active found`);
+    setScan(v => ({...v, on:false}));
+    msg("Scan Complete");
   };
 
-  const filtered=truckers.filter(t=>
+  const filtered = truckers.filter(t => 
     t.name.toLowerCase().includes(filter.q.toLowerCase()) || t.dot.includes(filter.q)
   );
 
-  if(!user) return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh"}}>
-       <button className="btn btn-amber" onClick={()=>{
-         localStorage.setItem("_sess",JSON.stringify({u:"Mustajab"}));
-         window.location.reload();
-       }}>Enter Database</button>
-    </div>
-  );
-
-  return(
+  return (
     <div style={{display:"flex",flexDirection:"column",height:"100vh"}}>
-      <div style={{background:"var(--surface)",padding:"10px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <b style={{color:"var(--amber-d)",letterSpacing:"1px"}}>◈ TRUCKER INTEL PRO</b>
-        <span style={{fontSize:11,color:"var(--text3)"}}>Operator: {user}</span>
+      <div style={{background:"var(--surface)",padding:"12px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between"}}>
+        <b style={{color:"var(--amber-d)"}}>◈ TRUCKER INTEL — HYBRID SCRAPER v3</b>
       </div>
 
       <div style={{display:"flex",flex:1,padding:15,gap:15,overflow:"hidden"}}>
         <div className="sidebar">
           <div className="card" style={{padding:15}}>
-            <div style={{display:"flex",marginBottom:12,borderBottom:"1px solid var(--border)"}}>
-              <button className={`tab ${tab==="lookup"?"active":""}`} onClick={()=>setTab("lookup")}>Single</button>
-              <button className={`tab ${tab==="scan"?"active":""}`} onClick={()=>setTab("scan")}>Auto Scan</button>
+            <div style={{display:"flex",marginBottom:10}}>
+              <button className={`tab ${tab==="lookup"?"active":""}`} onClick={()=>setTab("lookup")}>Manual</button>
+              <button className={`tab ${tab==="scan"?"active":""}`} onClick={()=>setTab("scan")}>Auto</button>
             </div>
-            {tab==="lookup"?(
+            {tab==="lookup" ? (
               <div style={{display:"flex",gap:5}}>
                 <input className="inp" placeholder="DOT #" value={dotVal} onChange={e=>setDotVal(e.target.value)}/>
-                <button className="btn btn-amber" onClick={lookupOne} disabled={loading}>{loading?"...":"Go"}</button>
+                <button className="btn btn-amber" onClick={runLookup} disabled={loading}>{loading?"...":"Go"}</button>
               </div>
-            ):(
+            ) : (
               <div>
                 <div style={{display:"flex",gap:5,marginBottom:10}}>
-                  <input className="inp" placeholder="Start" value={scan.s} onChange={e=>setScan(v=>({...v,s:e.target.value}))}/>
-                  <input className="inp" placeholder="End" value={scan.e} onChange={e=>setScan(v=>({...v,e:e.target.value}))}/>
+                  <input className="inp" placeholder="Start" onChange={e=>setScan(v=>({...v,s:e.target.value}))}/>
+                  <input className="inp" placeholder="End" onChange={e=>setScan(v=>({...v,e:e.target.value}))}/>
                 </div>
-                {scan.on?(
-                  <div>
-                    <div className="pb"><div className="pbf" style={{width:`${Math.round(((scan.cur-scan.s)/scan.tot)*100)}%`}}/></div>
-                    <button className="btn btn-red" style={{width:"100%",marginTop:5}} onClick={()=>scanRef.current=false}>Stop</button>
-                  </div>
-                ):<button className="btn btn-amber" style={{width:"100%"}} onClick={startScan}>Start Pro Scan</button>}
+                <button className="btn btn-amber" style={{width:"100%"}} onClick={startAutoScan} disabled={scan.on}>
+                   {scan.on ? `Scanning ${scan.cur}...` : "Start Hybrid Scan"}
+                </button>
+                {scan.on && <div className="pb"><div className="pbf" style={{width:`${((scan.cur-scan.s)/scan.tot)*100}%`}}/></div>}
               </div>
             )}
           </div>
-          <div className="card" style={{padding:15}}>
-             <label className="lbl">Filter Records</label>
-             <input className="inp" placeholder="Search saved..." value={filter.q} onChange={e=>setFilter({q:e.target.value})}/>
-          </div>
+          <input className="inp" placeholder="Filter List..." value={filter.q} onChange={e=>setFilter({q:e.target.value})}/>
         </div>
 
-        <div className="card" style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <div style={{flex:1,overflow:"auto"}}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>USDOT</th>
-                  <th>Company Name</th>
-                  <th>Direct Phone</th>
-                  <th>Location</th>
-                  <th>Trucks</th>
-                  <th></th>
+        <div className="card" style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <table className="tbl">
+            <thead>
+              <tr><th>DOT</th><th>Company</th><th>Verified Phone</th><th>Location</th><th>Trucks</th><th></th></tr>
+            </thead>
+            <tbody>
+              {filtered.map(t => (
+                <tr key={t.dot}>
+                  <td style={{fontFamily:"monospace"}}>#{t.dot}</td>
+                  <td><b>{t.name}</b></td>
+                  <td className="phone-found">{t.phone === "Missing" ? <span style={{color:"#999",fontWeight:400}}>NOT ON SAFER</span> : t.phone}</td>
+                  <td>{t.location}</td>
+                  <td><span className="tag tag-green">{t.trucks}</span></td>
+                  <td><button className="btn btn-red" style={{padding:"2px 8px"}} onClick={()=>{
+                     const n = truckers.filter(x=>x.dot!==t.dot);
+                     setTruckers(n); localStorage.setItem(`t:${user}`, JSON.stringify(n));
+                  }}>✕</button></td>
                 </tr>
-              </thead>
-              <tbody>
-                {filtered.map(t=>(
-                  <tr key={t.dot}>
-                    <td style={{fontFamily:"monospace",color:"var(--amber-d)"}}>#{t.dot}</td>
-                    <td><b>{t.name}</b></td>
-                    <td className="phone-highlight">{t.phone === "No Phone Found" ? <span style={{color:"#888",fontWeight:400}}>N/A</span> : t.phone}</td>
-                    <td>{t.city}, {t.state}</td>
-                    <td><span className="tag tag-green">{t.trucks}</span></td>
-                    <td><button className="btn btn-red" style={{padding:"2px 8px"}} onClick={()=>{
-                      const n = trRef.current.filter(x=>x.dot!==t.dot);
-                      trRef.current=n; setTruckers(n);
-                      localStorage.setItem(`t:${user}`,JSON.stringify(n));
-                    }}>✕</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
       {toast && <div className={`toast toast-${toast.type}`}>{toast.text}</div>}
